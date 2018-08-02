@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2018 Microchip Technology Inc.  All rights reserved.
+ * Joshua Henderson <joshua.henderson@microchip.com>
+ */
 #ifndef __M2D_H__
 #define __M2D_H__
 
@@ -12,31 +16,44 @@ extern "C"  {
 
 	enum m2d_format
 	{
-		M2D_RGB444 = 0,
-		M2D_ARGB4444 = 1,
-		M2D_RGB5551 = 2,
-		M2D_RGB555 = 3,
-		M2D_ARGB8888 = 4,
-		M2D_RGBA8888 = 5,
+		M2D_A4IDX4 = 0,
+		M2D_A8 = 1,
+		M2D_IDX8 = 2,
+		M2D_A8IDX8 = 3,
+		M2D_RGB12 = 4,
+		M2D_ARGB16 = 5,
+		M2D_RGB15 = 6,
+		M2D_TRGB16 = 7,
+		M2D_RGBT16 = 8,
+		M2D_RGB16 = 9,
+		M2D_RGB24 = 10,
+		M2D_ARGB32 = 11,
+		M2D_RGBA32 = 12,
+
+		/* format aliases */
+		M2D_RGB5551 = M2D_RGBT16,
+		M2D_RGB1555 = M2D_TRGB16,
+		M2D_ARGB8888 = M2D_ARGB32,
+		M2D_RGBA8888 = M2D_RGBA32,
 	};
 
 	enum m2d_blend_factors
 	{
-		M2D_ZERO                  = 0,
-		M2D_ONE                   = 1,
+		M2D_ZERO = 0,
+		M2D_ONE = 1,
 		M2D_SRC_COLOR = 2,
-		M2D_ONE_MINUS_SRC_COLOR   = 3,
-		M2D_DST_COLOR             = 4,
-		M2D_ONE_MINUS_DST_COLOR   = 5,
-		M2D_SRC_ALPHA   = 6,
-		M2D_ONE_MINUS_SRC_ALPHA   = 7,
-		M2D_DST_ALPHA   = 8,
-		M2D_ONE_MINUS_DST_ALPHA   = 9,
-		M2D_CONSTANT_COLOR   = 10,
-		M2D_ONE_MINUS_CONSTANT_COLOR   = 11,
-		M2D_CONSTANT_ALPHA   = 12,
-		M2D_ONE_MINUS_CONSTANT_ALPHA   = 13,
-		M2D_SRC_ALPHA_SATURATE   = 14,
+		M2D_ONE_MINUS_SRC_COLOR = 3,
+		M2D_DST_COLOR = 4,
+		M2D_ONE_MINUS_DST_COLOR = 5,
+		M2D_SRC_ALPHA = 6,
+		M2D_ONE_MINUS_SRC_ALPHA = 7,
+		M2D_DST_ALPHA = 8,
+		M2D_ONE_MINUS_DST_ALPHA = 9,
+		M2D_CONSTANT_COLOR = 10,
+		M2D_ONE_MINUS_CONSTANT_COLOR = 11,
+		M2D_CONSTANT_ALPHA = 12,
+		M2D_ONE_MINUS_CONSTANT_ALPHA = 13,
+		M2D_SRC_ALPHA_SATURATE = 14,
 	};
 
 	enum m2d_rop_mode
@@ -55,7 +72,7 @@ extern "C"  {
 		M2D_MAX = 4,
 		M2D_SPE = 5,
 
-		// Special Blend w/M2D_SPE
+		/* Special Blend w/M2D_SPE */
 		M2D_SPE_LIGHTEN = M2D_SPE | (1<<4),
 		M2D_SPE_DARKEN = M2D_SPE | (1<<5),
 		M2D_SPE_MULTIPLY = M2D_SPE | (1<<6),
@@ -83,44 +100,70 @@ extern "C"  {
 	struct m2d_surface
 	{
 		enum m2d_format format;
-		enum m2d_transfer_dir dir;
-
 		struct m2d_buf* buf;
+		int pitch;
 
 		int x;
 		int y;
-		int pitch;
 		int width;
 		int height;
 
+		enum m2d_transfer_dir dir;
 		enum m2d_blend_func func;
 		enum m2d_blend_factors fact;
-
-		int global_alpha;
 	};
 
 	struct m2d_buf
 	{
-		void *handle;
-		void *vaddr;
-		int paddr;
-		int size;
+		uint32_t name;
+		uint32_t paddr;
+		uint32_t size;
+		uint32_t vaddr;
 	};
 
 	int m2d_open(void **handle);
-	int m2d_close(void *handle);
+	void m2d_close(void *handle);
+
+	/**
+	 * Flush any pending requests to the GPU.
+	 *
+	 * Submitted requests are always buffered.  This causes the GPU to act
+	 * on any pending request.
+	 */
 	int m2d_flush(void *handle);
 
+	/**
+	 * Wait for vsync from LCD controller.
+	 */
+	int m2d_wfe(void *handle);
+
+	/**
+	 * @note This may block if the internal buffer is full.
+	 */
 	int m2d_fill(void* handle, uint32_t argb, struct m2d_surface *dst);
+
+	/**
+	 * @note This may block if the internal buffer is full.
+	 */
 	int m2d_copy(void* handle, struct m2d_surface* src, struct m2d_surface* dst);
+
+	/**
+	 * @note This may block if the internal buffer is full.
+	 */
 	int m2d_blend(void *handle, struct m2d_surface* src0,
 		      struct m2d_surface* src1,
 		      struct m2d_surface* dst);
-	//int m2d_rop(void *handle, enum m2d_rop_mode, struct m2d_surface *sp[], int surfaces)
 
-	struct m2d_buf *m2d_alloc(int size);
-	struct m2d_buf *m2d_buf_from_virt_addr(void *vaddr, int size);
-	int m2d_free(struct m2d_buf *buf);
+	/**
+	 * @note This may block if the internal buffer is full.
+	 */
+	/*int m2d_rop(void *handle, enum m2d_rop_mode mode, struct m2d_surface *sp[], int surfaces)*/
+
+	struct m2d_buf *m2d_alloc_from_name(void *handle, uint32_t name);
+	struct m2d_buf *m2d_alloc(void *handle, uint32_t size);
+	void m2d_free(struct m2d_buf *buf);
+
+	int m2d_fd(void* handle);
 
 #ifdef __cplusplus
 }

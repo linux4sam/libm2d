@@ -1,0 +1,121 @@
+/*
+ * Copyright (C) 2018 Microchip Technology Inc.  All rights reserved.
+ * Joshua Henderson <joshua.henderson@microchip.com>
+ */
+
+#include "m2d.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+
+static int format_pitch(uint32_t format, uint32_t width)
+{
+	switch (format)
+	{
+	case M2D_ARGB16:
+	case M2D_RGB16:
+	case M2D_RGBT16:
+	case M2D_TRGB16:
+		return width * 2;
+	case M2D_ARGB32:
+	case M2D_RGBA32:
+		return width * 4;
+	default:
+		fprintf(stderr, "unsupported pitch format: %d\n", format);
+		break;
+	}
+
+	return 0;
+}
+
+static int fill(void* handle, struct m2d_buf* buf, uint32_t rgba,
+		int x, int y, int w, int h, int pitch)
+{
+	struct m2d_surface src;
+	int ret = 0;
+
+	src.buf = buf;
+	src.format = M2D_RGB16;
+	src.pitch = pitch;
+	src.x = x;
+	src.y = y;
+	src.width = w-1;
+	src.height = h-1;
+	src.dir = M2D_XY00;
+
+	if (m2d_fill(handle, rgba, &src))
+	{
+		ret = -1;
+		goto abort;
+	}
+
+	if (m2d_flush(handle) != 0)
+	{
+		ret = -1;
+		goto abort;
+	}
+
+	return ret;
+abort:
+	printf("fill error\n");
+	return ret;
+}
+
+int main(int argc, char** argv)
+{
+	void* handle;
+
+	srand(time(NULL));
+
+	if (m2d_open(&handle) != 0)
+	{
+		return -1;
+	}
+
+	struct m2d_buf* buf = m2d_alloc_from_name(handle, atoi(argv[1]));
+
+	uint32_t rgbai = 0;
+	uint32_t rgba[] =
+		{
+			0x55ff0000,
+			0x5500ff00,
+			0x550000ff,
+		};
+	int pitch = format_pitch(M2D_RGB16, 480);
+	int count = 0;
+	struct timespec start;
+	clock_gettime(CLOCK_MONOTONIC, &start);
+
+	while (1)
+	{
+		int x = rand() % (480-50) + 0;
+		int y = rand() % (272-50) + 0;
+		int w = 50;
+		int h = 50;
+
+		fill(handle, buf, rgba[rgbai++ % (sizeof(rgba)/sizeof(rgba[0]))],
+		     x, y, w, h, pitch);
+
+		if (++count == 1000)
+		{
+			struct timespec end;
+			clock_gettime(CLOCK_MONOTONIC, &end);
+
+			if (end.tv_nsec < start.tv_nsec) {
+				end.tv_nsec += 1000000000;
+				end.tv_sec--;
+			}
+
+			printf("%ld.%09ld\n", (long)(end.tv_sec - start.tv_sec),
+			       end.tv_nsec - start.tv_nsec);
+
+			count = 0;
+			clock_gettime(CLOCK_MONOTONIC_RAW, &start);
+		}
+	}
+
+	m2d_free(buf);
+	m2d_close(handle);
+
+	return 0;
+}

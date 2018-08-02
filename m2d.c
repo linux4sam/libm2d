@@ -1,17 +1,18 @@
+/*
+ * Copyright (C) 2018 Microchip Technology Inc.  All rights reserved.
+ * Joshua Henderson <joshua.henderson@microchip.com>
+ */
 #include "m2d.h"
+#include <assert.h>
+#include <drm/atmel_drm.h>
+#include <fcntl.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>
-#include <sys/types.h>
 #include <sys/stat.h>
-#include <fcntl.h>
+#include <sys/types.h>
 #include <unistd.h>
-//#include <linux/drm/gfx2d_drm.h>
-
-struct device
-{
-	int fd;
-};
 
 #define FILL0_OPCODE 28
 #define FILL0_REG 16
@@ -106,7 +107,12 @@ enum reg_id
 	GPREG5 = 15,
 };
 
-static inline int word_write(uint32_t* word, uint32_t offset, uint32_t value)
+struct device
+{
+	int fd;
+};
+
+static inline void word_write(uint32_t* word, uint32_t offset, uint32_t value)
 {
 	*word |= (value << offset);
 }
@@ -203,7 +209,7 @@ static int gen_blend_cmd(uint32_t* buf, enum m2d_transfer_dir dir,uint32_t dwidt
 	word_write(buf + i, BLEND4_SY1, sy1);
 	word_write(buf + i, BLEND4_SX1, sx1);
 	++i;
-	if (func & 0xf == M2D_SPE)
+	if ((func & 0xf) == M2D_SPE)
 		word_write(buf + i, BLEND5_SPE, func >> 4);
 	word_write(buf + i, BLEND5_FUNC, func & 0xf);
 	word_write(buf + i, BLEND5_DFACT, dfact);
@@ -247,49 +253,68 @@ static int gen_rop_cmd(uint32_t* buf, enum m2d_transfer_dir dir,uint32_t dwidth,
 
 int m2d_open(void **handle)
 {
+	//const char* device_file = "atmel-hlcdc";
+	const char* device_file = "/dev/dri/card0";
 	struct device* h = calloc(1, sizeof(struct device));
+	assert(h);
 
-	h->fd = open("/dev/gpu0", O_RDWR);
+	//h->fd = drmOpen(device_file, NULL);
+	h->fd = open(device_file, O_RDWR, 0);
 
 	*handle = h;
 	return 0;
 }
 
-int m2d_close(void *handle)
+void m2d_close(void *handle)
 {
 	struct device* h = handle;
+	assert(h);
 	m2d_flush(handle);
 	close(h->fd);
 	free(h);
 }
 
-#define DRM_IOCTL_GFX2D_SUBMIT 0
-#define DRM_IOCTL_GFX2D_FLUSH 0
-
 int m2d_fill(void *handle, uint32_t argb, struct m2d_surface *dst)
 {
 	struct device* h = handle;
-	uint32_t data[32];
+	struct drm_gfx2d_submit req;
+	uint32_t data[32] = {0};
 	uint32_t *buf = data;
+
+	assert(h);
+
 	buf += gen_ldr_cmd(buf, GFX2D_PA0, dst->buf->paddr);
 	buf += gen_ldr_cmd(buf, GFX2D_PITCH0, dst->pitch);
+	buf += gen_ldr_cmd(buf, GFX2D_CFG0, dst->format);
 	buf += gen_fill_cmd(buf, dst->dir, dst->width, dst->height,
 			    dst->x, dst->y, argb);
-	return ioctl(h->fd, DRM_IOCTL_GFX2D_SUBMIT, data, (buf-data) * 4);
+	req.size = (buf - data);
+	req.buf = (__u32)data;
+
+	return ioctl(h->fd, DRM_IOCTL_GFX2D_SUBMIT, &req, sizeof(req));
 }
 
 int m2d_copy(void *handle, struct m2d_surface* src, struct m2d_surface* dst)
 {
 	struct device* h = handle;
-	uint32_t data[32];
+	struct drm_gfx2d_submit req;
+	uint32_t data[32] = {0};
 	uint32_t *buf = data;
+
+	assert(h);
+
 	buf += gen_ldr_cmd(buf, GFX2D_PA0, dst->buf->paddr);
 	buf += gen_ldr_cmd(buf, GFX2D_PITCH0, dst->pitch);
+	buf += gen_ldr_cmd(buf, GFX2D_CFG0, dst->format);
 	buf += gen_ldr_cmd(buf, GFX2D_PA1, src->buf->paddr);
 	buf += gen_ldr_cmd(buf, GFX2D_PITCH1, src->pitch);
+	buf += gen_ldr_cmd(buf, GFX2D_CFG1, src->format);
 	buf += gen_copy_cmd(buf, dst->dir, dst->width, dst->height,
 			    dst->x, dst->y, src->x, src->y);
-	return ioctl(h->fd, DRM_IOCTL_GFX2D_SUBMIT, data, (buf-data) * 4);
+	req.size = (buf - data);
+	req.buf = (__u32)data;
+
+	return ioctl(h->fd, DRM_IOCTL_GFX2D_SUBMIT, &req, sizeof(req));
 }
 
 int m2d_blend(void *handle, struct m2d_surface* src0,
@@ -297,14 +322,21 @@ int m2d_blend(void *handle, struct m2d_surface* src0,
 	      struct m2d_surface* dst)
 {
 	struct device* h = handle;
-	uint32_t data[32];
+	struct drm_gfx2d_submit submit;
+	uint32_t data[32] = {0};
 	uint32_t *buf = data;
+
+	assert(h);
+
 	buf += gen_ldr_cmd(buf, GFX2D_PA0, dst->buf->paddr);
 	buf += gen_ldr_cmd(buf, GFX2D_PITCH0, dst->pitch);
+	buf += gen_ldr_cmd(buf, GFX2D_CFG0, dst->format);
 	buf += gen_ldr_cmd(buf, GFX2D_PA1, src0->buf->paddr);
 	buf += gen_ldr_cmd(buf, GFX2D_PITCH1, src0->pitch);
+	buf += gen_ldr_cmd(buf, GFX2D_CFG1, src0->format);
 	buf += gen_ldr_cmd(buf, GFX2D_PA2, src1->buf->paddr);
 	buf += gen_ldr_cmd(buf, GFX2D_PITCH2, src1->pitch);
+	buf += gen_ldr_cmd(buf, GFX2D_CFG2, src1->format);
 	buf += gen_blend_cmd(buf, dst->dir, dst->width, dst->height,
 			     dst->x, dst->y,
 			     src0->x, src0->y,
@@ -312,41 +344,102 @@ int m2d_blend(void *handle, struct m2d_surface* src0,
 			     dst->func,
 			     dst->fact,
 			     src0->fact);
-	return ioctl(h->fd, DRM_IOCTL_GFX2D_SUBMIT, data, (buf-data) * 4);
+	submit.size = (buf - data);
+	submit.buf = (__u32)data;
+	return ioctl(h->fd, DRM_IOCTL_GFX2D_SUBMIT, &submit, sizeof(submit));
 }
 
 /*
-  int m2d_rop(void *handle, enum m2d_rop_mode, struct m2d_surface *sp[], int surfaces)
-  {
-  }
+int m2d_rop(void *handle, enum m2d_rop_mode mode, struct m2d_surface *sp[], int surfaces)
+{
+	submit.size = (buf - data);
+	submit.buf = data;
+	return ioctl(h->fd, DRM_IOCTL_GFX2D_SUBMIT, &submit, sizeof(submit));
+}
 */
 
-//int m2d_cache_op(struct m2d_buf *buf, enum m2d_cache_mode op);
-struct m2d_buf *m2d_alloc(int size)
+struct m2d_buf *m2d_alloc_from_name(void* handle, uint32_t name)
 {
-	struct m2d_buf* buf = calloc(1, sizeof(struct m2d_buf));
+	struct device* h = handle;
+	assert(h);
 
-	buf->handle = 0;
-	buf->vaddr = 0;
-	buf->paddr = 0;
-	buf->size = size;
+	struct drm_gfx2d_gem_addr req;
+	req.name = name;
 
-	return buf;
+	if (ioctl(h->fd, DRM_IOCTL_GFX2D_GEM_ADDR, &req, sizeof(req)) == 0) {
+		struct m2d_buf* buf = calloc(1, sizeof(struct m2d_buf));
+		buf->name = name;
+		buf->paddr = req.paddr;
+		buf->size = req.size;
+
+		printf("gem paddr: 0x%x\n", buf->paddr);
+
+		return buf;
+	}
+
+	return 0;
 }
 
-struct m2d_buf *m2d_buf_from_virt_addr(void *vaddr, int size)
+struct m2d_buf *m2d_alloc(void* handle, uint32_t size)
 {
+	struct device* h = handle;
+	assert(h);
+
+	struct drm_gfx2d_gem_new req;
+	req.flags = 0;
+	req.size = size;
+
+	if (ioctl(h->fd, DRM_IOCTL_GFX2D_GEM_NEW, &req, sizeof(req)) == 0) {
+		struct m2d_buf* buf = calloc(1, sizeof(struct m2d_buf));
+		buf->name = req.handle;
+		buf->paddr = req.paddr;
+		buf->vaddr = req.vaddr;
+		buf->size = size;// req.size;
+
+		printf("gem paddr: 0x%x\n", buf->paddr);
+		printf("gem vaddr: 0x%x\n", buf->vaddr);
+
+		return buf;
+	}
+
+	return 0;
 }
 
-int m2d_free(struct m2d_buf *buf)
+/*struct m2d_buf *m2d_buf_from_virt_addr(void *vaddr, int size)
 {
-	// TODO:
+}
+*/
 
+void m2d_free(struct m2d_buf *buf)
+{
 	free(buf);
+}
+
+int m2d_wfe(void *handle)
+{
+	struct device* h = handle;
+	struct drm_gfx2d_submit submit;
+	uint32_t data[32] = {0};
+	uint32_t *buf = data;
+
+	assert(h);
+	buf += gen_wfe_cmd(buf);
+
+	return ioctl(h->fd, DRM_IOCTL_GFX2D_SUBMIT, &submit, sizeof(submit));
 }
 
 int m2d_flush(void *handle)
 {
 	struct device* h = handle;
+	assert(h);
+
 	return ioctl(h->fd, DRM_IOCTL_GFX2D_FLUSH);
+}
+
+int m2d_fd(void* handle)
+{
+	struct device* h = handle;
+	assert(h);
+
+	return h->fd;
 }
