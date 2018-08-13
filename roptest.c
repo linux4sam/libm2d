@@ -92,46 +92,77 @@ static struct m2d_buf* load_png(const char* filename, void* handle)
 	return src;
 }
 
-static int copy(void* handle, struct m2d_buf* srcb, struct m2d_buf* dstb,
-		int x, int y)
+static int rop(void* handle,
+	       struct m2d_buf* srca,
+	       struct m2d_buf* srcb,
+	       struct m2d_buf* srcc,
+	       struct m2d_buf* dst)
 {
-	struct m2d_surface src;
-	struct m2d_surface dst;
+	struct m2d_surface src0;
+	struct m2d_surface src1;
+	struct m2d_surface src2;
+	struct m2d_surface dst0;
 	int ret = 0;
 
-	src.buf = srcb;
-	src.format = M2D_ARGB8888;
-	src.pitch = format_pitch(src.format, 100);
-	src.x = 0;
-	src.y = 0;
-	src.width = 100;
-	src.height = 100;
-	src.dir = M2D_XY00;
+	src0.buf = srca;
+	src0.format = M2D_ARGB8888;
+	src0.pitch = format_pitch(src0.format, 272);
+	src0.x = 0;
+	src0.y = 0;
+	src0.width = 272;
+	src0.height = 272;
+	src0.dir = M2D_XY00;
 
-	dst.buf = dstb;
-	dst.format = M2D_RGB16;
-	dst.pitch = format_pitch(dst.format, 480);
-	dst.x = x;
-	dst.y = y;
-	dst.width = 100;
-	dst.height = 100;
-	dst.dir = M2D_XY00;
+	src1.buf = srcb;
+	src1.format = M2D_ARGB8888;
+	src1.pitch = format_pitch(src1.format, 272);
+	src1.x = 0;
+	src1.y = 0;
+	src1.width = 272;
+	src1.height = 272;
+	src1.dir = M2D_XY00;
 
-	if (m2d_copy(handle, &src, &dst))
+	src2.buf = srcc;
+	src2.format = M2D_ARGB8888;
+	src2.pitch = format_pitch(src2.format, 272);
+	src2.x = 0;
+	src2.y = 0;
+	src2.width = 272;
+	src2.height = 272;
+	src2.dir = M2D_XY00;
+
+	dst0.buf = dst;
+	dst0.format = M2D_RGB16;
+	dst0.pitch = format_pitch(dst0.format, 480);
+	dst0.x = 0;
+	dst0.y = 0;
+	dst0.width = 272;
+	dst0.height = 272;
+	dst0.dir = M2D_XY00;
+
+	struct m2d_surface* sp[] = { &dst0, &src0, &src1, &src2 };
+
+	for (int x = 0; x < 0xff;x++)
 	{
-		ret = -1;
-		goto abort;
-	}
+		if (m2d_rop(handle, ROP_MODE_ROP4, sp, 4, 0x00, x))
+		{
+			ret = -1;
+			goto abort;
+		}
 
-	if (m2d_flush(handle) != 0)
-	{
-		ret = -1;
-		goto abort;
+		if (m2d_flush(handle) != 0)
+		{
+			ret = -1;
+			goto abort;
+		}
+
+		struct timespec ts = {1,0};
+		nanosleep(&ts, NULL);
 	}
 
 	return ret;
 abort:
-	printf("copy error\n");
+	printf("rop error\n");
 	return ret;
 }
 
@@ -149,39 +180,23 @@ int main(int argc, char** argv)
 	struct m2d_buf* dst = m2d_alloc_from_name(handle, atoi(argv[1]));
 	assert(dst);
 
-	struct m2d_buf* src = load_png("image.png", handle);
-	assert(src);
+	struct m2d_buf* src0 = load_png("rop0.png", handle);
+	assert(src0);
 
-	int count = 0;
-	struct timespec start;
-	clock_gettime(CLOCK_MONOTONIC, &start);
+	struct m2d_buf* src1 = load_png("rop1.png", handle);
+	assert(src1);
 
-	while (1)
-	{
-		int x = rand() % (480-100) + 0;
-		int y = rand() % (272-100) + 0;
+	struct m2d_buf* src2 = load_png("rop2.png", handle);
+	assert(src2);
 
-		copy(handle, src, dst, x, y);
+	rop(handle, src0, src1, src2, dst);
 
-		if (++count == 1000)
-		{
-			struct timespec end;
-			clock_gettime(CLOCK_MONOTONIC, &end);
+	struct timespec ts = {2,0};
+	nanosleep(&ts, NULL);
 
-			if (end.tv_nsec < start.tv_nsec) {
-				end.tv_nsec += 1000000000;
-				end.tv_sec--;
-			}
-
-			printf("%ld.%09ld\n", (long)(end.tv_sec - start.tv_sec),
-			       end.tv_nsec - start.tv_nsec);
-
-			count = 0;
-			clock_gettime(CLOCK_MONOTONIC_RAW, &start);
-		}
-	}
-
-	m2d_free(src);
+	m2d_free(src0);
+	m2d_free(src1);
+	m2d_free(src2);
 	m2d_free(dst);
 	m2d_close(handle);
 

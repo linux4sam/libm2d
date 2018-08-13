@@ -39,8 +39,8 @@ static int fill(void* handle, struct m2d_buf* buf, uint32_t rgba,
 	src.pitch = pitch;
 	src.x = x;
 	src.y = y;
-	src.width = w-1;
-	src.height = h-1;
+	src.width = w;
+	src.height = h;
 	src.dir = M2D_XY00;
 
 	if (m2d_fill(handle, rgba, &src))

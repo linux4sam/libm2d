@@ -65,28 +65,28 @@ extern "C"  {
 
 	enum m2d_blend_func
 	{
-		M2D_ADD = 0,
-		M2D_SUBTRACT = 1,
-		M2D_REVERSE = 2,
-		M2D_MIN = 3,
-		M2D_MAX = 4,
-		M2D_SPE = 5,
+		M2D_BLEND_ADD = 0,
+		M2D_BLEND_SUBTRACT = 1,
+		M2D_BLEND_REVERSE = 2,
+		M2D_BLEND_MIN = 3,
+		M2D_BLEND_MAX = 4,
+		M2D_BLEND_SPE = 5,
 
-		/* Special Blend w/M2D_SPE */
-		M2D_SPE_LIGHTEN = M2D_SPE | (1<<4),
-		M2D_SPE_DARKEN = M2D_SPE | (1<<5),
-		M2D_SPE_MULTIPLY = M2D_SPE | (1<<6),
-		M2D_SPE_AVERAGE = M2D_SPE | (1<<7),
-		M2D_SPE_ADD = M2D_SPE | (1<<8),
-		M2D_SPE_SUBTRACT = M2D_SPE | (1<<9),
-		M2D_SPE_DIFFERENCE = M2D_SPE | (1<<10),
-		M2D_SPE_NEGOTIATION = M2D_SPE | (1<<11),
-		M2D_SPE_SCREEN = M2D_SPE | (1<<12),
-		M2D_SPE_OVERLAY = M2D_SPE | (1<<13),
-		M2D_SPE_DODGE = M2D_SPE | (1<<14),
-		M2D_SPE_BURN = M2D_SPE | (1<<15),
-		M2D_SPE_REFLECT = M2D_SPE | (1<<16),
-		M2D_SPE_GLOW = M2D_SPE | (1<<17),
+		/* Special Blend w/M2D_BLEND_SPE */
+		M2D_BLEND_SPE_LIGHTEN = M2D_BLEND_SPE | (1<<4),
+		M2D_BLEND_SPE_DARKEN = M2D_BLEND_SPE | (1<<5),
+		M2D_BLEND_SPE_MULTIPLY = M2D_BLEND_SPE | (1<<6),
+		M2D_BLEND_SPE_AVERAGE = M2D_BLEND_SPE | (1<<7),
+		M2D_BLEND_SPE_ADD = M2D_BLEND_SPE | (1<<8),
+		M2D_BLEND_SPE_SUBTRACT = M2D_BLEND_SPE | (1<<9),
+		M2D_BLEND_SPE_DIFFERENCE = M2D_BLEND_SPE | (1<<10),
+		M2D_BLEND_SPE_NEGOTIATION = M2D_BLEND_SPE | (1<<11),
+		M2D_BLEND_SPE_SCREEN = M2D_BLEND_SPE | (1<<12),
+		M2D_BLEND_SPE_OVERLAY = M2D_BLEND_SPE | (1<<13),
+		M2D_BLEND_SPE_DODGE = M2D_BLEND_SPE | (1<<14),
+		M2D_BLEND_SPE_BURN = M2D_BLEND_SPE | (1<<15),
+		M2D_BLEND_SPE_REFLECT = M2D_BLEND_SPE | (1<<16),
+		M2D_BLEND_SPE_GLOW = M2D_BLEND_SPE | (1<<17),
 	};
 
 	enum m2d_transfer_dir
@@ -109,7 +109,6 @@ extern "C"  {
 		int height;
 
 		enum m2d_transfer_dir dir;
-		enum m2d_blend_func func;
 		enum m2d_blend_factors fact;
 	};
 
@@ -118,11 +117,11 @@ extern "C"  {
 		uint32_t name;
 		uint32_t paddr;
 		uint32_t size;
-		uint32_t vaddr;
+		void* vaddr;
 	};
 
-	int m2d_open(void **handle);
-	void m2d_close(void *handle);
+	int m2d_open(void** handle);
+	void m2d_close(void* handle);
 
 	/**
 	 * Flush any pending requests to the GPU.
@@ -130,17 +129,17 @@ extern "C"  {
 	 * Submitted requests are always buffered.  This causes the GPU to act
 	 * on any pending request.
 	 */
-	int m2d_flush(void *handle);
+	int m2d_flush(void* handle);
 
 	/**
 	 * Wait for vsync from LCD controller.
 	 */
-	int m2d_wfe(void *handle);
+	int m2d_wfe(void* handle);
 
 	/**
 	 * @note This may block if the internal buffer is full.
 	 */
-	int m2d_fill(void* handle, uint32_t argb, struct m2d_surface *dst);
+	int m2d_fill(void* handle, uint32_t argb, struct m2d_surface* dst);
 
 	/**
 	 * @note This may block if the internal buffer is full.
@@ -150,18 +149,23 @@ extern "C"  {
 	/**
 	 * @note This may block if the internal buffer is full.
 	 */
-	int m2d_blend(void *handle, struct m2d_surface* src0,
+	int m2d_blend(void* handle, struct m2d_surface* src0,
 		      struct m2d_surface* src1,
-		      struct m2d_surface* dst);
+		      struct m2d_surface* dst,
+		      enum m2d_blend_func func);
 
 	/**
 	 * @note This may block if the internal buffer is full.
 	 */
-	/*int m2d_rop(void *handle, enum m2d_rop_mode mode, struct m2d_surface *sp[], int surfaces)*/
+	int m2d_rop(void* handle, enum m2d_rop_mode mode,
+		    struct m2d_surface* sp[], int nsurfaces,
+		    uint8_t ropl,
+		    uint8_t roph);
 
-	struct m2d_buf *m2d_alloc_from_name(void *handle, uint32_t name);
-	struct m2d_buf *m2d_alloc(void *handle, uint32_t size);
-	void m2d_free(struct m2d_buf *buf);
+	struct m2d_buf* m2d_alloc(void* handle, uint32_t size);
+	struct m2d_buf* m2d_alloc_from_name(void* handle, uint32_t name);
+
+	void m2d_free(struct m2d_buf* buf);
 
 	int m2d_fd(void* handle);
 
