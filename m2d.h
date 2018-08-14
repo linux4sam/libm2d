@@ -7,13 +7,16 @@
 
 #include <stdint.h>
 
-#define M2D_VERSION_MAJOR   0
-#define M2D_VERSION_MINOR   1
+#define M2D_VERSION_MAJOR   1
+#define M2D_VERSION_MINOR   0
 
 #ifdef __cplusplus
 extern "C"  {
 #endif
 
+	/**
+	 * Supported surface formats.
+	 */
 	enum m2d_format
 	{
 		M2D_A4IDX4 = 0,
@@ -37,6 +40,9 @@ extern "C"  {
 		M2D_RGBA8888 = M2D_RGBA32,
 	};
 
+	/**
+	 * Source and destination blend factors used by m2d_blend().
+	 */
 	enum m2d_blend_factors
 	{
 		M2D_ZERO = 0,
@@ -56,6 +62,9 @@ extern "C"  {
 		M2D_SRC_ALPHA_SATURATE = 14,
 	};
 
+	/**
+	 * Raster operation modes.
+	 */
 	enum m2d_rop_mode
 	{
 		ROP_MODE_ROP2 = 0,
@@ -63,6 +72,9 @@ extern "C"  {
 		ROP_MODE_ROP4 = 2,
 	};
 
+	/**
+	 * Blend functions used by m2d_blend().
+	 */
 	enum m2d_blend_func
 	{
 		M2D_BLEND_ADD = 0,
@@ -97,6 +109,9 @@ extern "C"  {
 		M2D_XY11 = 3,
 	};
 
+	/**
+	 * A surface operation definition.
+	 */
 	struct m2d_surface
 	{
 		enum m2d_format format;
@@ -112,42 +127,80 @@ extern "C"  {
 		enum m2d_blend_factors fact;
 	};
 
+	/**
+	 * A buffer, which can be assigned to a surface.
+	 */
 	struct m2d_buf
 	{
-		uint32_t name;
-		uint32_t paddr;
+		/** Size of the buffer. */
 		uint32_t size;
+		/** GEM name. */
+		uint32_t name;
+		/** Physical address of the buffer. */
+		uint32_t paddr;
+		/** Virtual, usually mmap()'ed address of the buffer. */
 		void* vaddr;
 	};
 
+	/**
+	 * Open the device and get a handle.
+	 * @return 0 on success, non-zero on error.
+	 */
 	int m2d_open(void** handle);
+
+	/**
+	 * Close the device and free any resources.
+	 */
 	void m2d_close(void* handle);
 
 	/**
-	 * Flush any pending requests to the GPU.
-	 *
-	 * Submitted requests are always buffered.  This causes the GPU to act
-	 * on any pending request.
+	 * Allocate a new surface buffer given the specified size.
+	 * @param size Size in bytes.
+	 * @return NULL on error.
 	 */
-	int m2d_flush(void* handle);
+	struct m2d_buf* m2d_alloc(void* handle, uint32_t size);
+
+	/**
+	 * Allocate a new surface buffer with a pre-existing GEM name.
+	 * @param name GEM object name.
+	 */
+	struct m2d_buf* m2d_alloc_from_name(void* handle, uint32_t name);
+
+	/**
+	 * Free an allocated surface buffer.
+	 */
+	void m2d_free(struct m2d_buf* buf);
 
 	/**
 	 * Wait for vsync from LCD controller.
+	 *
+	 * @return 0 on success, non-zero on error.
+	 * @note You must call m2d_flush() to submit any pending requests.
 	 */
 	int m2d_wfe(void* handle);
 
 	/**
-	 * @note This may block if the internal buffer is full.
+	 * Fill a destination surface with the given ARGB value.
+	 *
+	 * @return 0 on success, non-zero on error.
+	 * @note You must call m2d_flush() to submit any pending requests.
 	 */
 	int m2d_fill(void* handle, uint32_t argb, struct m2d_surface* dst);
 
 	/**
-	 * @note This may block if the internal buffer is full.
+	 * Copy a source surface to a destination surface.
+	 *
+	 * @return 0 on success, non-zero on error.
+	 * @note You must call m2d_flush() to submit any pending requests.
 	 */
-	int m2d_copy(void* handle, struct m2d_surface* src, struct m2d_surface* dst);
+	int m2d_copy(void* handle, struct m2d_surface* src,
+		     struct m2d_surface* dst);
 
 	/**
-	 * @note This may block if the internal buffer is full.
+	 * Blend 2 source surfaces into a destination surface.
+	 *
+	 * @return 0 on success, non-zero on error.
+	 * @note You must call m2d_flush() to submit any pending requests.
 	 */
 	int m2d_blend(void* handle, struct m2d_surface* src0,
 		      struct m2d_surface* src1,
@@ -155,18 +208,32 @@ extern "C"  {
 		      enum m2d_blend_func func);
 
 	/**
-	 * @note This may block if the internal buffer is full.
+	 * Raster operation from 1 to 3 source surfaces, into a destination
+	 * surface.
+	 *
+	 * @return 0 on success, non-zero on error.
+	 * @note You must call m2d_flush() to submit any pending requests.
 	 */
 	int m2d_rop(void* handle, enum m2d_rop_mode mode,
 		    struct m2d_surface* sp[], int nsurfaces,
-		    uint8_t ropl,
-		    uint8_t roph);
+		    uint8_t ropl, uint8_t roph);
 
-	struct m2d_buf* m2d_alloc(void* handle, uint32_t size);
-	struct m2d_buf* m2d_alloc_from_name(void* handle, uint32_t name);
+	/**
+	 * Flush any pending requests to the GPU.
+	 *
+	 * Submitted requests are always buffered.  This causes the GPU to act
+	 * on any pending request.
+	 *
+	 * @return 0 on success, non-zero on error.
+	 * @note This may block if the internal buffer is full.
+	 */
+	int m2d_flush(void* handle);
 
-	void m2d_free(struct m2d_buf* buf);
-
+	/**
+	 * Get the internal DRI file descriptor.
+	 *
+	 * @return < 0 on error, otherwise the file descriptor.
+	 */
 	int m2d_fd(void* handle);
 
 #ifdef __cplusplus
