@@ -4,6 +4,7 @@
  */
 
 #include "m2d.h"
+#include "m2d_utils.h"
 #include <assert.h>
 #include <cairo.h>
 #include <drm_fourcc.h>
@@ -11,47 +12,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-
-int fourcc_to_m2d(uint32_t fourcc)
-{
-	switch (fourcc)
-	{
-		//case DRM_FORMAT_XRGB4444: return M2D_ARGB16;
-	case DRM_FORMAT_ARGB4444: return M2D_ARGB16;
-		//case DRM_FORMAT_RGBA4444:
-	case DRM_FORMAT_ARGB1555: return M2D_TRGB16;
-	case DRM_FORMAT_RGB565: return M2D_RGB16;
-	case DRM_FORMAT_RGB888: return M2D_RGB24;
-		//case DRM_FORMAT_XRGB8888: return M2D_ARGB32;
-	case DRM_FORMAT_ARGB8888: return M2D_ARGB32;
-	case DRM_FORMAT_RGBA8888: return M2D_RGBA32;
-	}
-
-	printf("unsupported format: %d\n", fourcc);
-
-	return 0;
-}
-
-
-static int format_pitch(uint32_t format, uint32_t width)
-{
-	switch (format)
-	{
-	case M2D_ARGB16:
-	case M2D_RGB16:
-	case M2D_RGBT16:
-	case M2D_TRGB16:
-		return width * 2;
-	case M2D_ARGB32:
-	case M2D_RGBA32:
-		return width * 4;
-	default:
-		fprintf(stderr, "unsupported pitch format: %d\n", format);
-		break;
-	}
-
-	return 0;
-}
 
 static struct m2d_buf* load_png(const char* filename, void* handle)
 {
@@ -101,20 +61,20 @@ static int copy(void* handle, struct m2d_buf* srcb, struct m2d_buf* dstb,
 
 	src.buf = srcb;
 	src.format = M2D_ARGB8888;
-	src.pitch = format_pitch(src.format, 100);
+	src.pitch = m2d_format_pitch(src.format, 50);
 	src.x = 0;
 	src.y = 0;
-	src.width = 100;
-	src.height = 100;
+	src.width = 50;
+	src.height = 50;
 	src.dir = M2D_XY00;
 
 	dst.buf = dstb;
 	dst.format = M2D_RGB16;
-	dst.pitch = format_pitch(dst.format, 480);
+	dst.pitch = m2d_format_pitch(dst.format, 480);
 	dst.x = x;
 	dst.y = y;
-	dst.width = 100;
-	dst.height = 100;
+	dst.width = 50;
+	dst.height = 50;
 	dst.dir = M2D_XY00;
 
 	if (m2d_copy(handle, &src, &dst))
@@ -149,7 +109,7 @@ int main(int argc, char** argv)
 	struct m2d_buf* dst = m2d_alloc_from_name(handle, atoi(argv[1]));
 	assert(dst);
 
-	struct m2d_buf* src = load_png("image.png", handle);
+	struct m2d_buf* src = load_png("copy.png", handle);
 	assert(src);
 
 	int count = 0;
@@ -158,8 +118,8 @@ int main(int argc, char** argv)
 
 	while (1)
 	{
-		int x = rand() % (480-100) + 0;
-		int y = rand() % (272-100) + 0;
+		int x = rand() % (480-50) + 0;
+		int y = rand() % (272-50) + 0;
 
 		copy(handle, src, dst, x, y);
 

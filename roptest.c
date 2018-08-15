@@ -4,6 +4,7 @@
  */
 
 #include "m2d.h"
+#include "m2d_utils.h"
 #include <assert.h>
 #include <cairo.h>
 #include <drm_fourcc.h>
@@ -11,46 +12,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-
-int fourcc_to_m2d(uint32_t fourcc)
-{
-	switch (fourcc)
-	{
-		//case DRM_FORMAT_XRGB4444: return M2D_ARGB16;
-	case DRM_FORMAT_ARGB4444: return M2D_ARGB16;
-		//case DRM_FORMAT_RGBA4444:
-	case DRM_FORMAT_ARGB1555: return M2D_TRGB16;
-	case DRM_FORMAT_RGB565: return M2D_RGB16;
-	case DRM_FORMAT_RGB888: return M2D_RGB24;
-		//case DRM_FORMAT_XRGB8888: return M2D_ARGB32;
-	case DRM_FORMAT_ARGB8888: return M2D_ARGB32;
-	case DRM_FORMAT_RGBA8888: return M2D_RGBA32;
-	}
-
-	printf("unsupported format: %d\n", fourcc);
-
-	return 0;
-}
-
-static int format_pitch(uint32_t format, uint32_t width)
-{
-	switch (format)
-	{
-	case M2D_ARGB16:
-	case M2D_RGB16:
-	case M2D_RGBT16:
-	case M2D_TRGB16:
-		return width * 2;
-	case M2D_ARGB32:
-	case M2D_RGBA32:
-		return width * 4;
-	default:
-		fprintf(stderr, "unsupported pitch format: %d\n", format);
-		break;
-	}
-
-	return 0;
-}
 
 static void parse_color(uint32_t in, uint8_t* r, uint8_t* g, uint8_t* b,  uint8_t* a)
 {
@@ -69,8 +30,10 @@ static void genmask(unsigned char* dst, unsigned char* src, int w, int h)
 
 	memset(dst, 0, w * h / 8);
 
-	for (y = 0; y < h; y++) {
-		for (x = 0; x < w; x++) {
+	for (y = 0; y < h; y++)
+	{
+		for (x = 0; x < w; x++)
+		{
 			uint8_t r;
 			uint8_t g;
 			uint8_t b;
@@ -78,7 +41,8 @@ static void genmask(unsigned char* dst, unsigned char* src, int w, int h)
 			uint32_t offset = (w*y) + x;
 			parse_color(*(src0 + offset), &r, &g, &b, &a);
 
-			if (a) {
+			if (a)
+			{
 				uint32_t word = offset / 32;
 				uint32_t bit = offset % 32;
 				dst0[word] |= (1<<bit);
@@ -98,19 +62,18 @@ static struct m2d_buf* load_png(const char* filename, void* handle, int mask)
 	assert(image);
 
 	cairo_format_t format = CAIRO_FORMAT_ARGB32;
-	//cairo_format_t format = CAIRO_FORMAT_RGB16_565;
-
 	int width = cairo_image_surface_get_width(image);
 	int height = cairo_image_surface_get_height(image);
 	int stride = cairo_format_stride_for_width(format, width);
 
-	struct m2d_buf* src = m2d_alloc(handle, stride*height);
+	struct m2d_buf* src = m2d_alloc(handle, stride * height);
 
 	printf("creating surface %d,%d ...\n", width, height);
 
 	if (mask)
 	{
-		genmask(src->vaddr, cairo_image_surface_get_data(image), width, height);
+		genmask(src->vaddr, cairo_image_surface_get_data(image),
+			width, height);
 		cairo_surface_destroy(image);
 	}
 	else
@@ -150,7 +113,8 @@ static int rop(void* handle,
 
 	src0.buf = srca;
 	src0.format = M2D_ARGB8888;
-	src0.pitch = format_pitch(src0.format, 272);
+	//src0.format = M2D_RGB16;
+	src0.pitch = m2d_format_pitch(src0.format, 272);
 	src0.x = 0;
 	src0.y = 0;
 	src0.width = 272;
@@ -159,7 +123,8 @@ static int rop(void* handle,
 
 	src1.buf = srcb;
 	src1.format = M2D_ARGB8888;
-	src1.pitch = format_pitch(src1.format, 272);
+	//src1.format = M2D_RGB16;
+	src1.pitch = m2d_format_pitch(src1.format, 272);
 	src1.x = 0;
 	src1.y = 0;
 	src1.width = 272;
@@ -168,7 +133,8 @@ static int rop(void* handle,
 
 	src2.buf = srcc;
 	src2.format = M2D_ARGB8888;
-	src2.pitch = format_pitch(src2.format, 272);
+	//src2.format = M2D_RGB16;
+	src2.pitch = m2d_format_pitch(src2.format, 272);
 	src2.x = 0;
 	src2.y = 0;
 	src2.width = 272;
@@ -177,7 +143,7 @@ static int rop(void* handle,
 
 	dst0.buf = dst;
 	dst0.format = M2D_RGB16;
-	dst0.pitch = format_pitch(dst0.format, 480);
+	dst0.pitch = m2d_format_pitch(dst0.format, 480);
 	dst0.x = 0;
 	dst0.y = 0;
 	dst0.width = 272;

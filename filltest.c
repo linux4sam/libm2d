@@ -4,29 +4,10 @@
  */
 
 #include "m2d.h"
+#include "m2d_utils.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-
-static int format_pitch(uint32_t format, uint32_t width)
-{
-	switch (format)
-	{
-	case M2D_ARGB16:
-	case M2D_RGB16:
-	case M2D_RGBT16:
-	case M2D_TRGB16:
-		return width * 2;
-	case M2D_ARGB32:
-	case M2D_RGBA32:
-		return width * 4;
-	default:
-		fprintf(stderr, "unsupported pitch format: %d\n", format);
-		break;
-	}
-
-	return 0;
-}
 
 static int fill(void* handle, struct m2d_buf* buf, uint32_t rgba,
 		int x, int y, int w, int h, int pitch)
@@ -81,7 +62,7 @@ int main(int argc, char** argv)
 			0x5500ff00,
 			0x550000ff,
 		};
-	int pitch = format_pitch(M2D_RGB16, 480);
+	int pitch = m2d_format_pitch(M2D_RGB16, 480);
 	int count = 0;
 	struct timespec start;
 	clock_gettime(CLOCK_MONOTONIC, &start);
