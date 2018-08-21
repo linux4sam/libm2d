@@ -7,6 +7,7 @@ CFLAGS += -I/home/jhenderson/linux-install/include
 APP_FLAGS = -flto -fwhole-program
 
 .c.o :
+	$(CC) -c $(CFLAGS) -S $<
 	$(CC) -c $(CFLAGS) -o $@ $<
 
 headers = m2d.h m2d_utils.h
@@ -70,7 +71,7 @@ roptest: $(roptest_objs) libm2d.a
 	$(CC) $(CFLAGS) $(roptest_objs) -o $@ $(LDLIBS) -lm2d
 
 clean:
-	rm -f $(libm2d_a_objs) libm2d.a \
+	rm -f *.s $(libm2d_a_objs) libm2d.a \
 		filltest $(filltest_objs) \
 		copytest $(copytest_objs) \
 		blendtest $(blendtest_objs) \
