@@ -2,8 +2,8 @@
  * Copyright (C) 2018 Microchip Technology Inc.  All rights reserved.
  * Joshua Henderson <joshua.henderson@microchip.com>
  */
-#include "m2d.h"
-#include "m2d_utils.h"
+#include "m2d/m2d.h"
+#include "m2d/utils.h"
 #include <drm_fourcc.h>
 #include <stdio.h>
 
@@ -24,7 +24,7 @@ int m2d_format_from_fourcc(uint32_t fourcc)
 
 	fprintf(stderr, "error: unsupported format: %d\n", fourcc);
 
-	return 0;
+	return -1;
 }
 
 int m2d_format_pitch(uint32_t format, uint32_t width)
@@ -44,5 +44,5 @@ int m2d_format_pitch(uint32_t format, uint32_t width)
 		break;
 	}
 
-	return 0;
+	return -1;
 }

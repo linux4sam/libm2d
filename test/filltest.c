@@ -3,8 +3,8 @@
  * Joshua Henderson <joshua.henderson@microchip.com>
  */
 
-#include "m2d.h"
-#include "m2d_utils.h"
+#include "m2d/m2d.h"
+#include "m2d/utils.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>

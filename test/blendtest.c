@@ -2,8 +2,8 @@
  * Copyright (C) 2018 Microchip Technology Inc.  All rights reserved.
  * Joshua Henderson <joshua.henderson@microchip.com>
  */
-#include "m2d.h"
-#include "m2d_utils.h"
+#include "m2d/m2d.h"
+#include "m2d/utils.h"
 #include <assert.h>
 #include <cairo.h>
 #include <drm_fourcc.h>

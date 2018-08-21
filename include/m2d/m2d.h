@@ -4,7 +4,9 @@
  */
 #ifndef __M2D_H__
 #define __M2D_H__
-
+/**
+ * @file m2d.h
+ */
 #include <stdint.h>
 
 #define M2D_VERSION_MAJOR   1
@@ -144,17 +146,22 @@ extern "C"  {
 
 	/**
 	 * Open the device and get a handle.
+	 *
+	 * @param handle Returned handle on success.
 	 * @return 0 on success, non-zero on error.
 	 */
 	int m2d_open(void** handle);
 
 	/**
 	 * Close the device and free any resources.
+	 * @param handle An open m2d handle.
 	 */
 	void m2d_close(void* handle);
 
 	/**
 	 * Allocate a new surface buffer given the specified size.
+	 *
+	 * @param handle An open m2d handle.
 	 * @param size Size in bytes.
 	 * @return NULL on error.
 	 */
@@ -162,18 +169,23 @@ extern "C"  {
 
 	/**
 	 * Allocate a new surface buffer with a pre-existing GEM name.
+	 *
+	 * @param handle An open m2d handle.
 	 * @param name GEM object name.
 	 */
 	struct m2d_buf* m2d_alloc_from_name(void* handle, uint32_t name);
 
 	/**
 	 * Free an allocated surface buffer.
+	 *
+	 * @param buf An allocated m2d buffer.
 	 */
 	void m2d_free(struct m2d_buf* buf);
 
 	/**
 	 * Wait for vsync from LCD controller.
 	 *
+	 * @param handle An open m2d handle.
 	 * @return 0 on success, non-zero on error.
 	 * @note You must call m2d_flush() to submit any pending requests.
 	 */
@@ -190,6 +202,7 @@ extern "C"  {
 	/**
 	 * Copy a source surface to a destination surface.
 	 *
+	 * @param handle An open m2d handle.
 	 * @return 0 on success, non-zero on error.
 	 * @note You must call m2d_flush() to submit any pending requests.
 	 */
@@ -199,6 +212,7 @@ extern "C"  {
 	/**
 	 * Blend 2 source surfaces into a destination surface.
 	 *
+	 * @param handle An open m2d handle.
 	 * @return 0 on success, non-zero on error.
 	 * @note You must call m2d_flush() to submit any pending requests.
 	 */
@@ -211,6 +225,7 @@ extern "C"  {
 	 * Raster operation from 1 to 3 source surfaces, into a destination
 	 * surface.
 	 *
+	 * @param handle An open m2d handle.
 	 * @return 0 on success, non-zero on error.
 	 * @note You must call m2d_flush() to submit any pending requests.
 	 */
@@ -224,6 +239,7 @@ extern "C"  {
 	 * Submitted requests are always buffered.  This causes the GPU to act
 	 * on any pending request.
 	 *
+	 * @param handle An open m2d handle.
 	 * @return 0 on success, non-zero on error.
 	 * @note This may block if the internal buffer is full.
 	 */
@@ -232,6 +248,7 @@ extern "C"  {
 	/**
 	 * Get the internal DRI file descriptor.
 	 *
+	 * @param handle An open m2d handle.
 	 * @return < 0 on error, otherwise the file descriptor.
 	 */
 	int m2d_fd(void* handle);

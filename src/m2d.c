@@ -2,7 +2,7 @@
  * Copyright (C) 2018 Microchip Technology Inc.  All rights reserved.
  * Joshua Henderson <joshua.henderson@microchip.com>
  */
-#include "m2d.h"
+#include "m2d/m2d.h"
 #include <assert.h>
 #include <drm/atmel_drm.h>
 #include <errno.h>

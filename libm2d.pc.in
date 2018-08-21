@@ -1,0 +1,10 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: libm2d
+Description: Microchip 2D Graphics API
+Version: @PACKAGE_VERSION@
+Libs: -L${libdir} -lm2d
+Cflags: -I${includedir} -I${includedir}/m2d
