@@ -5,6 +5,7 @@
 
 #include "m2d/m2d.h"
 #include "m2d/utils.h"
+#include "utils.h"
 #include <assert.h>
 #include <cairo.h>
 #include <drm_fourcc.h>
@@ -51,50 +52,30 @@ static void genmask(unsigned char* dst, unsigned char* src, int w, int h)
 	}
 }
 
-static struct m2d_buf* load_png(const char* filename, void* handle, int mask)
+static struct m2d_buf* load_png_as_mask(const char* filename, void* handle)
 {
-	cairo_t* cr;
-	cairo_surface_t* surface;
 	cairo_surface_t* image;
+	cairo_format_t format = CAIRO_FORMAT_ARGB32;
+	int width;
+	int height;
+	int stride;
+	struct m2d_buf* src;
 
 	printf("loading image...\n");
 	image = cairo_image_surface_create_from_png(filename);
 	assert(image);
 
-	cairo_format_t format = CAIRO_FORMAT_ARGB32;
-	int width = cairo_image_surface_get_width(image);
-	int height = cairo_image_surface_get_height(image);
-	int stride = cairo_format_stride_for_width(format, width);
+	width = cairo_image_surface_get_width(image);
+	height = cairo_image_surface_get_height(image);
+	stride = cairo_format_stride_for_width(format, width);
 
-	struct m2d_buf* src = m2d_alloc(handle, stride * height);
+	src = m2d_alloc(handle, stride * height);
 
-	printf("creating surface %d,%d ...\n", width, height);
+	printf("creating mask surface %d,%d ...\n", width, height);
 
-	if (mask)
-	{
-		genmask(src->vaddr, cairo_image_surface_get_data(image),
-			width, height);
-		cairo_surface_destroy(image);
-	}
-	else
-	{
-		surface = cairo_image_surface_create_for_data(src->vaddr,
-							      format,
-							      width, height,
-							      stride);
-		assert(surface);
-
-		cr = cairo_create(surface);
-		assert(cr);
-
-		cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
-		cairo_set_source_surface(cr, image, 0, 0);
-
-		cairo_paint(cr);
-		cairo_surface_destroy(image);
-		cairo_surface_destroy(surface);
-		cairo_destroy(cr);
-	}
+	genmask(src->vaddr, cairo_image_surface_get_data(image),
+		width, height);
+	cairo_surface_destroy(image);
 
 	return src;
 }
@@ -150,25 +131,22 @@ static int rop(void* handle,
 	dst0.height = 272;
 	dst0.dir = M2D_XY00;
 
-	struct m2d_surface* sp[] = { &dst0, &src0, &src1, &src2 };
+	for (int x = 0; x <= 0xff; x++) {
+		struct m2d_surface* sp[] = { &dst0, &src0, &src1, &src2 };
+		struct timespec ts = {1, 0};
 
-	for (int x = 0; x <= 0xff;x++)
-	{
-		if (m2d_rop(handle, ROP_MODE_ROP4, sp, 4, x, 0))
-			//if (m2d_rop(handle, ROP_MODE_ROP3, sp, 3, x, 0))
-			//if (m2d_rop(handle, ROP_MODE_ROP2, sp, 2, x, 0))
-		{
+		if (m2d_rop(handle, ROP_MODE_ROP4, sp, 4, x, 0)) {
+			//if (m2d_rop(handle, ROP_MODE_ROP3, sp, 3, x, 0)) {
+			//if (m2d_rop(handle, ROP_MODE_ROP2, sp, 2, x, 0)) {
 			ret = -1;
 			goto abort;
 		}
 
-		if (m2d_flush(handle) != 0)
-		{
+		if (m2d_flush(handle) != 0) {
 			ret = -1;
 			goto abort;
 		}
 
-		struct timespec ts = {1,0};
 		nanosleep(&ts, NULL);
 	}
 
@@ -181,28 +159,28 @@ abort:
 int main(int argc, char** argv)
 {
 	void* handle;
+	struct m2d_buf* dst;
+	struct m2d_buf* src0;
+	struct m2d_buf* src1;
+	struct m2d_buf* src2;
 
-	if (m2d_open(&handle) != 0)
-	{
+	if (m2d_open(&handle) != 0) {
 		return -1;
 	}
 
-	struct m2d_buf* dst = m2d_alloc_from_name(handle, atoi(argv[1]));
+	dst = m2d_alloc_from_name(handle, atoi(argv[1]));
 	assert(dst);
 
-	struct m2d_buf* src0 = load_png("rop0.png", handle, 0);
+	src0 = load_png("rop0.png", handle);
 	assert(src0);
 
-	struct m2d_buf* src1 = load_png("rop1.png", handle, 0);
+	src1 = load_png("rop1.png", handle);
 	assert(src1);
 
-	struct m2d_buf* src2 = load_png("rop2.png", handle, 1);
+	src2 = load_png_as_mask("rop2.png", handle);
 	assert(src2);
 
 	rop(handle, src0, src1, src2, dst);
-
-	struct timespec ts = {2,0};
-	nanosleep(&ts, NULL);
 
 	m2d_free(src0);
 	m2d_free(src1);

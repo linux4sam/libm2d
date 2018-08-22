@@ -24,14 +24,12 @@ static int fill(void* handle, struct m2d_buf* buf, uint32_t rgba,
 	src.height = h;
 	src.dir = M2D_XY00;
 
-	if (m2d_fill(handle, rgba, &src))
-	{
+	if (m2d_fill(handle, rgba, &src)) {
 		ret = -1;
 		goto abort;
 	}
 
-	if (m2d_flush(handle) != 0)
-	{
+	if (m2d_flush(handle) != 0) {
 		ret = -1;
 		goto abort;
 	}
@@ -45,30 +43,28 @@ abort:
 int main(int argc, char** argv)
 {
 	void* handle;
-
-	srand(time(NULL));
-
-	if (m2d_open(&handle) != 0)
-	{
-		return -1;
-	}
-
-	struct m2d_buf* buf = m2d_alloc_from_name(handle, atoi(argv[1]));
-
+	struct m2d_buf* buf;
 	uint32_t rgbai = 0;
-	uint32_t rgba[] =
-		{
-			0x55ff0000,
-			0x5500ff00,
-			0x550000ff,
-		};
+	uint32_t rgba[] = {
+		0x55ff0000,
+		0x5500ff00,
+		0x550000ff,
+	};
 	int pitch = m2d_format_pitch(M2D_RGB16, 480);
 	int count = 0;
 	struct timespec start;
+
+	srand(time(NULL));
+
+	if (m2d_open(&handle) != 0) {
+		return -1;
+	}
+
+	buf = m2d_alloc_from_name(handle, atoi(argv[1]));
+
 	clock_gettime(CLOCK_MONOTONIC, &start);
 
-	while (1)
-	{
+	while (1) {
 		int x = rand() % (480-50) + 0;
 		int y = rand() % (272-50) + 0;
 		int w = 50;
@@ -77,8 +73,7 @@ int main(int argc, char** argv)
 		fill(handle, buf, rgba[rgbai++ % (sizeof(rgba)/sizeof(rgba[0]))],
 		     x, y, w, h, pitch);
 
-		if (++count == 1000)
-		{
+		if (++count == 1000) {
 			struct timespec end;
 			clock_gettime(CLOCK_MONOTONIC, &end);
 
