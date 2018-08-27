@@ -5,7 +5,7 @@
 ## Dependencies
 
 - libdrm >= 2.4.0
-- cairo >= 1.14.6
+- cairo >= 1.14.6 (conditional)
 
 ## Building
 

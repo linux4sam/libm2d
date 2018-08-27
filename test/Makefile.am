@@ -1,6 +1,10 @@
 AM_CFLAGS = $(WARN_CFLAGS) -I$(top_srcdir)/include
 
-bin_PROGRAMS = copytest filltest roptest blendtest
+bin_PROGRAMS = filltest
+
+if HAVE_CAIRO
+bin_PROGRAMS += copytest blendtest roptest
+endif
 
 copytest_SOURCES = copytest.c utils.c utils.h
 copytest_CFLAGS = $(AM_CFLAGS) $(LIBDRM_CFLAGS) $(CAIRO_CFLAGS)

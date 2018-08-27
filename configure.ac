@@ -80,8 +80,15 @@ AC_CHECK_HEADERS([fcntl.h stdint.h stdlib.h string.h sys/ioctl.h unistd.h])
 PKG_CHECK_MODULES(LIBDRM, [libdrm >= 2.4.0], [], [AC_MSG_ERROR([
      libdrm is a hard dependency, but a sufficient version was not found.])])
 
-PKG_CHECK_MODULES(CAIRO, [cairo >= 1.14.6], [], [AC_MSG_ERROR([
-     cairo is a hard dependency, but a sufficient version was not found.])])
+AC_ARG_ENABLE([cairo],
+              [AS_HELP_STRING([--disable-cairo],
+                              [Disable support for cairo (default: auto)])],
+              [CAIRO=$enableval], [CAIRO=yes])
+
+if test "x$CAIRO" = xyes; then
+   PKG_CHECK_MODULES(CAIRO, [cairo >= 1.14.6], [have_cairo=yes], [have_cairo=no])
+fi
+AM_CONDITIONAL(HAVE_CAIRO, [test "x$have_cairo" = xyes])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_CHECK_HEADER_STDBOOL
