@@ -6,6 +6,7 @@
 #define __M2D_UTILS_H__
 /**
  * @file utils.h
+ * @brief M2D Utilities
  */
 
 #include <stdint.h>

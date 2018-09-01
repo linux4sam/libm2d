@@ -113,6 +113,7 @@ enum reg_id
 
 struct device
 {
+	/** File descriptor. */
 	int fd;
 
 	/**
@@ -592,7 +593,12 @@ struct m2d_buf* m2d_alloc(void* handle, uint32_t size)
 		}
 	}
 
-	return 0;
+	return NULL;
+}
+
+struct m2d_buf* m2d_alloc_from_virt(void* handle, void* virt, uint32_t size)
+{
+	return NULL;
 }
 
 void m2d_free(struct m2d_buf* buf)
