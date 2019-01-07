@@ -129,7 +129,7 @@ struct device
 	uint32_t reg_cache[16];
 };
 
-static inline void err_msg(const char *format, ...)
+static void err_msg(const char *format, ...)
 {
 	va_list ap;
 	va_start(ap, format);
