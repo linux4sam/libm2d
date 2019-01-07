@@ -13,6 +13,9 @@
 #include <string.h>
 #include <time.h>
 
+#define SCREEN_WIDTH 800
+#define SCREEN_HEIGHT 480
+
 static int blend(void* handle, struct m2d_buf* srca, struct m2d_buf* srcb,
 		 struct m2d_buf* dst, enum m2d_blend_func mode)
 {
@@ -42,7 +45,7 @@ static int blend(void* handle, struct m2d_buf* srca, struct m2d_buf* srcb,
 
 	dst0.buf = dst;
 	dst0.format = M2D_RGB16;
-	dst0.pitch = m2d_format_pitch(dst0.format, 480);
+	dst0.pitch = m2d_format_pitch(dst0.format, SCREEN_WIDTH);
 	dst0.x = 0;
 	dst0.y = 0;
 	dst0.width = 272;

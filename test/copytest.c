@@ -14,6 +14,9 @@
 #include <string.h>
 #include <time.h>
 
+#define SCREEN_WIDTH 800
+#define SCREEN_HEIGHT 480
+
 static int copy(void* handle, struct m2d_buf* srcb, struct m2d_buf* dstb,
 		int x, int y)
 {
@@ -32,7 +35,7 @@ static int copy(void* handle, struct m2d_buf* srcb, struct m2d_buf* dstb,
 
 	dst.buf = dstb;
 	dst.format = M2D_RGB16;
-	dst.pitch = m2d_format_pitch(dst.format, 480);
+	dst.pitch = m2d_format_pitch(dst.format, SCREEN_WIDTH);
 	dst.x = x;
 	dst.y = y;
 	dst.width = 50;
@@ -78,8 +81,8 @@ int main(int argc, char** argv)
 	clock_gettime(CLOCK_MONOTONIC, &start);
 
 	while (1) {
-		int x = rand() % (480-50) + 0;
-		int y = rand() % (272-50) + 0;
+		int x = rand() % (SCREEN_WIDTH-50) + 0;
+		int y = rand() % (SCREEN_HEIGHT-50) + 0;
 
 		copy(handle, src, dst, x, y);
 

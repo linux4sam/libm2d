@@ -40,6 +40,9 @@ abort:
 	return ret;
 }
 
+#define SCREEN_WIDTH 800
+#define SCREEN_HEIGHT 480
+
 int main(int argc, char** argv)
 {
 	void* handle;
@@ -50,7 +53,7 @@ int main(int argc, char** argv)
 		0x5500ff00,
 		0x550000ff,
 	};
-	int pitch = m2d_format_pitch(M2D_RGB16, 480);
+	int pitch = m2d_format_pitch(M2D_RGB16, SCREEN_WIDTH);
 	int count = 0;
 	struct timespec start;
 
@@ -65,8 +68,8 @@ int main(int argc, char** argv)
 	clock_gettime(CLOCK_MONOTONIC, &start);
 
 	while (1) {
-		int x = rand() % (480-50) + 0;
-		int y = rand() % (272-50) + 0;
+		int x = rand() % (SCREEN_WIDTH-50) + 0;
+		int y = rand() % (SCREEN_HEIGHT-50) + 0;
 		int w = 50;
 		int h = 50;
 

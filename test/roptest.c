@@ -80,6 +80,9 @@ static struct m2d_buf* load_png_as_mask(const char* filename, void* handle)
 	return src;
 }
 
+#define SCREEN_WIDTH 800
+#define SCREEN_HEIGHT 480
+
 static int rop(void* handle,
 	       struct m2d_buf* srca,
 	       struct m2d_buf* srcb,
@@ -124,7 +127,7 @@ static int rop(void* handle,
 
 	dst0.buf = dst;
 	dst0.format = M2D_RGB16;
-	dst0.pitch = m2d_format_pitch(dst0.format, 480);
+	dst0.pitch = m2d_format_pitch(dst0.format, SCREEN_WIDTH);
 	dst0.x = 0;
 	dst0.y = 0;
 	dst0.width = 272;
