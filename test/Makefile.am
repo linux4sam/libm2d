@@ -13,9 +13,9 @@ copytestdir = $(prefix)/share/@PACKAGE@
 dist_copytest_DATA = $(top_srcdir)/test/copy.png
 copytest_LDFLAGS = $(AM_LDFLAGS)
 
-filltest_SOURCES = filltest.c
-filltest_CFLAGS = $(AM_CFLAGS) $(LIBDRM_CFLAGS)
-filltest_LDADD = $(top_builddir)/src/libm2d.la $(LIBDRM_LIBS)
+filltest_SOURCES = filltest.c utils.c utils.h
+filltest_CFLAGS = $(AM_CFLAGS) $(LIBDRM_CFLAGS) $(CAIRO_CFLAGS)
+filltest_LDADD = $(top_builddir)/src/libm2d.la $(LIBDRM_LIBS) $(CAIRO_LIBS)
 filltestdir = $(prefix)/share/@PACKAGE@
 filltest_LDFLAGS = $(AM_LDFLAGS)
 

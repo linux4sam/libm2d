@@ -2,11 +2,17 @@
  * Copyright (C) 2018 Microchip Technology Inc.  All rights reserved.
  * Joshua Henderson <joshua.henderson@microchip.com>
  */
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 
 #include "utils.h"
-#include <cairo.h>
-#include <stdio.h>
 #include <assert.h>
+#include <stdio.h>
+#include <time.h>
+
+#ifdef HAVE_CAIRO
+#include <cairo.h>
 
 struct m2d_buf* load_png(const char* filename, void* handle)
 {
@@ -48,4 +54,49 @@ struct m2d_buf* load_png(const char* filename, void* handle)
 	cairo_destroy(cr);
 
 	return src;
+}
+#endif
+
+static void timespec_diff(struct timespec *start, struct timespec *stop,
+			  struct timespec *result)
+{
+	if ((stop->tv_nsec - start->tv_nsec) < 0) {
+		result->tv_sec = stop->tv_sec - start->tv_sec - 1;
+		result->tv_nsec = stop->tv_nsec - start->tv_nsec + 1000000000;
+	} else {
+		result->tv_sec = stop->tv_sec - start->tv_sec;
+		result->tv_nsec = stop->tv_nsec - start->tv_nsec;
+	}
+
+	return;
+}
+
+static struct timespec start;
+static unsigned int frames = 0;
+
+void fps_start(void)
+{
+	clock_gettime(CLOCK_MONOTONIC, &start);
+}
+
+void fps_frame(void)
+{
+	struct timespec now;
+	struct timespec diff;
+	unsigned int ms;
+	double sec;
+
+	frames++;
+
+	clock_gettime(CLOCK_MONOTONIC, &now);
+
+	timespec_diff(&start, &now, &diff);
+
+	ms = (diff.tv_sec) * 1000 + (diff.tv_nsec) / 1000000;
+	sec = ms / 1000.;
+	if (sec >= 1.0) {
+		printf("%.2f fps\n", frames / sec);
+		clock_gettime(CLOCK_MONOTONIC, &start);
+		frames = 0;
+	}
 }

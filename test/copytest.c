@@ -63,8 +63,11 @@ int main(int argc, char** argv)
 	void* handle;
 	struct m2d_buf* dst;
 	struct m2d_buf* src;
-	int count = 0;
-	struct timespec start;
+
+	if (argc != 2) {
+		printf("usage: %s GEM_NAME\n", argv[0]);
+		return -1;
+	}
 
 	srand(time(NULL));
 
@@ -78,7 +81,7 @@ int main(int argc, char** argv)
 	src = load_png("copy.png", handle);
 	assert(src);
 
-	clock_gettime(CLOCK_MONOTONIC, &start);
+	fps_start();
 
 	while (1) {
 		int x = rand() % (SCREEN_WIDTH-50) + 0;
@@ -86,21 +89,7 @@ int main(int argc, char** argv)
 
 		copy(handle, src, dst, x, y);
 
-		if (++count == 1000) {
-			struct timespec end;
-			clock_gettime(CLOCK_MONOTONIC, &end);
-
-			if (end.tv_nsec < start.tv_nsec) {
-				end.tv_nsec += 1000000000;
-				end.tv_sec--;
-			}
-
-			printf("%ld.%09ld\n", (long)(end.tv_sec - start.tv_sec),
-			       end.tv_nsec - start.tv_nsec);
-
-			count = 0;
-			clock_gettime(CLOCK_MONOTONIC_RAW, &start);
-		}
+		fps_frame();
 	}
 
 	m2d_free(src);

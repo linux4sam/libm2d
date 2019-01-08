@@ -9,4 +9,7 @@
 
 struct m2d_buf* load_png(const char* filename, void* handle);
 
+void fps_start(void);
+void fps_frame(void);
+
 #endif

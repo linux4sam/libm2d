@@ -5,6 +5,7 @@
 
 #include "m2d/m2d.h"
 #include "m2d/utils.h"
+#include "utils.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -54,8 +55,11 @@ int main(int argc, char** argv)
 		0x550000ff,
 	};
 	int pitch = m2d_format_pitch(M2D_RGB16, SCREEN_WIDTH);
-	int count = 0;
-	struct timespec start;
+
+	if (argc != 2) {
+		printf("usage: %s GEM_NAME\n", argv[0]);
+		return -1;
+	}
 
 	srand(time(NULL));
 
@@ -65,7 +69,7 @@ int main(int argc, char** argv)
 
 	buf = m2d_alloc_from_name(handle, atoi(argv[1]));
 
-	clock_gettime(CLOCK_MONOTONIC, &start);
+	fps_start();
 
 	while (1) {
 		int x = rand() % (SCREEN_WIDTH-50) + 0;
@@ -76,21 +80,7 @@ int main(int argc, char** argv)
 		fill(handle, buf, rgba[rgbai++ % (sizeof(rgba)/sizeof(rgba[0]))],
 		     x, y, w, h, pitch);
 
-		if (++count == 1000) {
-			struct timespec end;
-			clock_gettime(CLOCK_MONOTONIC, &end);
-
-			if (end.tv_nsec < start.tv_nsec) {
-				end.tv_nsec += 1000000000;
-				end.tv_sec--;
-			}
-
-			printf("%ld.%09ld\n", (long)(end.tv_sec - start.tv_sec),
-			       end.tv_nsec - start.tv_nsec);
-
-			count = 0;
-			clock_gettime(CLOCK_MONOTONIC_RAW, &start);
-		}
+		fps_frame();
 	}
 
 	m2d_free(buf);

@@ -87,6 +87,7 @@ AC_ARG_ENABLE([cairo],
 
 if test "x$CAIRO" = xyes; then
    PKG_CHECK_MODULES(CAIRO, [cairo >= 1.14.6], [have_cairo=yes], [have_cairo=no])
+   AC_DEFINE(HAVE_CAIRO, 1, [Have cairo support])
 fi
 AM_CONDITIONAL(HAVE_CAIRO, [test "x$have_cairo" = xyes])
 
