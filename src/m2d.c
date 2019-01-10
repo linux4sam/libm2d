@@ -137,6 +137,24 @@ static void err_msg(const char *format, ...)
 	va_end(ap);
 }
 
+#define unlikely(expr) (__builtin_expect (!!(expr), 0))
+
+static void dbg_msg(const char *format, ...)
+{
+	static int envset = -1;
+	va_list ap;
+
+	if (unlikely(envset < 0))
+		envset = !!getenv("LIBM2D_DEBUG");
+
+	if (envset)
+	{
+		va_start(ap, format);
+		vfprintf(stderr, format, ap);
+		va_end(ap);
+	}
+}
+
 static inline void word_set(uint32_t* word, uint32_t offset, uint32_t value)
 {
 	*word = (value << offset);
@@ -151,6 +169,8 @@ static int gen_ldr_cmd(struct device* h, uint32_t* buf,
 		       enum reg_id reg, uint32_t value)
 {
 	int i = 0;
+
+	dbg_msg("gen_ldr_cmd %d=%d\n", reg, value);
 
 	assert(reg < 16);
 
@@ -170,6 +190,9 @@ static int gen_ldr_cmd(struct device* h, uint32_t* buf,
 static int gen_str_cmd(uint32_t* buf, enum reg_id reg, uint32_t addr)
 {
 	int i = 0;
+
+	dbg_msg("gen_str_cmd %d=%d\n", reg, addr);
+
 	word_set(buf + i, STR0_OPCODE, 0x9);
 	word_write(buf + i, STR0_REG, reg);
 	word_write(buf + i, STR0_REGAD, addr);
@@ -181,6 +204,7 @@ static int gen_str_cmd(uint32_t* buf, enum reg_id reg, uint32_t addr)
 static int gen_wfe_cmd(uint32_t* buf)
 {
 	int i = 0;
+	dbg_msg("gen_wfe_cmd\n");
 	word_set(buf + i, WFE0_OPCODE, 0xA);
 	return ++i;
 }
@@ -190,6 +214,10 @@ static int gen_fill_cmd(uint32_t* buf, enum m2d_transfer_dir dir,uint32_t dwidth
 			uint32_t argb)
 {
 	int i = 0;
+
+	dbg_msg("gen_fill_cmd [%d,%d %d,%d]=%X\n",
+		dx, dy, dwidth, dheight, argb);
+
 	word_set(buf + i, FILL0_OPCODE, 0xB);
 	word_write(buf + i, FILL0_DIR, dir);
 	word_write(buf + i, FILL0_ARGS, 2);
@@ -209,6 +237,10 @@ static int gen_copy_cmd(uint32_t* buf, enum m2d_transfer_dir dir,uint32_t dwidth
 			uint32_t sx, uint32_t sy)
 {
 	int i = 0;
+
+	dbg_msg("gen_copy_cmd [%d,%d] -> [%d,%d %d,%d]\n",
+		sx, sy, dx, dy, dwidth, dheight);
+
 	word_set(buf + i, COPY0_OPCODE, 0xC);
 	word_write(buf + i, COPY0_HWT, 0);
 	word_write(buf + i, COPY0_DIR, dir);
@@ -233,6 +265,10 @@ static int gen_blend_cmd(uint32_t* buf, enum m2d_transfer_dir dir,uint32_t dwidt
 			 enum m2d_blend_factors sfact)
 {
 	int i = 0;
+
+	dbg_msg("gen_blend_cmd [%d,%d] [%d,%d] -> [%d,%d %d,%d]\n",
+		sx0, sy0, sx1, sy1, dx, dy, dwidth, dheight);
+
 	word_set(buf + i, BLEND0_OPCODE, 0xD);
 	word_write(buf + i, BLEND0_DIR, dir);
 	word_write(buf + i, BLEND0_ARGS, 4);
@@ -272,6 +308,10 @@ static int gen_rop_cmd(uint32_t* buf, enum m2d_transfer_dir dir,
 		       enum m2d_rop_mode mode)
 {
 	int i = 0;
+
+	dbg_msg("gen_rop_cmd [%d,%d] [%d, %d] -> [%d,%d %d,%d]\n",
+		sx0, sy0, sx1, sy1, dx, dy, dwidth, dheight);
+
 	word_set(buf + i, ROP0_OPCODE, 0xE);
 	word_write(buf + i, ROP0_ARGS, 5);
 	++i;
@@ -325,6 +365,8 @@ int m2d_open(void **handle)
 
 	*handle = h;
 
+	dbg_msg("open %s\n", device_file);
+
 	return ret;
 
 fail:
@@ -345,6 +387,8 @@ void m2d_close(void *handle)
 	close(h->fd);
 	free(h->cmdbuf);
 	free(h);
+
+	dbg_msg("close\n");
 }
 
 int m2d_fill(void *handle, uint32_t argb, struct m2d_surface *dst)
@@ -625,6 +669,7 @@ int m2d_wfe(void *handle)
 int m2d_flush(void *handle)
 {
 	struct device* h = handle;
+	dbg_msg("flush\n");
 	return ioctl(h->fd, DRM_IOCTL_GFX2D_FLUSH);
 }
 
