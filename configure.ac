@@ -16,21 +16,21 @@ AC_PROG_CXX
 AC_PROG_CC
 AC_PROG_INSTALL
 
-AC_DEFUN([LIBDRM_CC_TRY_FLAG], [
+AC_DEFUN([LIBM2D_CC_TRY_FLAG], [
   AC_MSG_CHECKING([whether $CC supports $1])
 
-  libdrm_save_CFLAGS="$CFLAGS"
+  libm2d_save_CFLAGS="$CFLAGS"
   CFLAGS="$CFLAGS $1"
 
-  AC_COMPILE_IFELSE([AC_LANG_SOURCE([ ])], [libdrm_cc_flag=yes], [libdrm_cc_flag=no])
-  CFLAGS="$libdrm_save_CFLAGS"
+  AC_COMPILE_IFELSE([AC_LANG_SOURCE([ ])], [libm2d_cc_flag=yes], [libm2d_cc_flag=no])
+  CFLAGS="$libm2d_save_CFLAGS"
 
-  if test "x$libdrm_cc_flag" = "xyes"; then
+  if test "x$libm2d_cc_flag" = "xyes"; then
     ifelse([$2], , :, [$2])
   else
     ifelse([$3], , :, [$3])
   fi
-  AC_MSG_RESULT([$libdrm_cc_flag])
+  AC_MSG_RESULT([$libm2d_cc_flag])
 ])
 
 MAYBE_WARN="-Wall -Wextra \
@@ -45,10 +45,10 @@ MAYBE_WARN="-Wall -Wextra \
 -Wno-missing-field-initializers"
 
 # invalidate cached value if MAYBE_WARN has changed
-if test "x$libdrm_cv_warn_maybe" != "x$MAYBE_WARN"; then
-	unset libdrm_cv_warn_cflags
+if test "x$libm2d_cv_warn_maybe" != "x$MAYBE_WARN"; then
+	unset libm2d_cv_warn_cflags
 fi
-AC_CACHE_CHECK([for supported warning flags], libdrm_cv_warn_cflags, [
+AC_CACHE_CHECK([for supported warning flags], libm2d_cv_warn_cflags, [
 	echo
 	WARN_CFLAGS=""
 
@@ -64,20 +64,20 @@ AC_CACHE_CHECK([for supported warning flags], libdrm_cv_warn_cflags, [
 	# last.
 
 	for W in $MAYBE_WARN; do
-		LIBDRM_CC_TRY_FLAG([$W], [WARN_CFLAGS="$WARN_CFLAGS $W"])
+		LIBM2D_CC_TRY_FLAG([$W], [WARN_CFLAGS="$WARN_CFLAGS $W"])
 	done
 
-	libdrm_cv_warn_cflags=$WARN_CFLAGS
-	libdrm_cv_warn_maybe=$MAYBE_WARN
+	libm2d_cv_warn_cflags=$WARN_CFLAGS
+	libm2d_cv_warn_maybe=$MAYBE_WARN
 
 	AC_MSG_CHECKING([which warning flags were supported])])
-WARN_CFLAGS="$libdrm_cv_warn_cflags"
+WARN_CFLAGS="$libm2d_cv_warn_cflags"
 AC_SUBST(WARN_CFLAGS)
 
 # Checks for header files.
 AC_CHECK_HEADERS([fcntl.h stdint.h stdlib.h string.h sys/ioctl.h unistd.h])
 
-PKG_CHECK_MODULES(LIBDRM, [libdrm >= 2.4.0], [], [AC_MSG_ERROR([
+AX_PKG_CHECK_MODULES(LIBDRM, [libdrm >= 2.4.0], [], [], [AC_MSG_ERROR([
      libdrm is a hard dependency, but a sufficient version was not found.])])
 
 AC_ARG_ENABLE([cairo],
@@ -86,7 +86,7 @@ AC_ARG_ENABLE([cairo],
               [CAIRO=$enableval], [CAIRO=yes])
 
 if test "x$CAIRO" = xyes; then
-   PKG_CHECK_MODULES(CAIRO, [cairo >= 1.14.6], [have_cairo=yes], [have_cairo=no])
+   AX_PKG_CHECK_MODULES(CAIRO, [], [cairo >= 1.14.6], [have_cairo=yes], [have_cairo=no])
    AC_DEFINE(HAVE_CAIRO, 1, [Have cairo support])
 fi
 AM_CONDITIONAL(HAVE_CAIRO, [test "x$have_cairo" = xyes])

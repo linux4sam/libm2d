@@ -8,4 +8,5 @@ Description: Microchip 2D Graphics API
 Version: @PACKAGE_VERSION@
 Libs: -L${libdir} -lm2d
 Cflags: -I${includedir} -I${includedir}/m2d
-Requires: libdrm cairo
+Requires: @AX_PACKAGE_REQUIRES@
+Requires.private: @AX_PACKAGE_REQUIRES_PRIVATE@
