@@ -581,7 +581,7 @@ static void* create_dumb_buffer(int fd, int size, uint32_t* name,
 
 	ret = drmIoctl(fd, DRM_IOCTL_MODE_CREATE_DUMB, &args1);
 	if (ret < 0) {
-		err_msg("error: DRM_IOCTL_MODE_CREATE_DUMB\n");
+		err_msg("error: DRM_IOCTL_MODE_CREATE_DUMB(%s)\n", strerror(errno));
 		return NULL;
 	}
 	*gem_handle = args1.handle;
@@ -590,7 +590,7 @@ static void* create_dumb_buffer(int fd, int size, uint32_t* name,
 	args2.handle = args1.handle;
 	ret = drmIoctl(fd, DRM_IOCTL_MODE_MAP_DUMB, &args2);
 	if (ret < 0) {
-		err_msg("error: DRM_IOCTL_MODE_MAP_DUMB\n");
+		err_msg("error: DRM_IOCTL_MODE_MAP_DUMB(%s)\n", strerror(errno));
 		return NULL;
 	}
 
@@ -598,7 +598,7 @@ static void* create_dumb_buffer(int fd, int size, uint32_t* name,
 		   fd, args2.offset);
 	if (ptr == MAP_FAILED)
 	{
-		err_msg("error: mmap failed\n");
+		err_msg("error: mmap failed(%s)\n", strerror(errno));
 		return NULL;
 	}
 
@@ -606,7 +606,7 @@ static void* create_dumb_buffer(int fd, int size, uint32_t* name,
 	flink.handle = args1.handle;
 	ret = drmIoctl(fd, DRM_IOCTL_GEM_FLINK, &flink);
 	if (ret < 0) {
-		err_msg("error: DRM_IOCTL_GEM_FLINK\n");
+		err_msg("error: DRM_IOCTL_GEM_FLINK(%s)\n", strerror(errno));
 		return NULL;
 	}
 
@@ -658,7 +658,7 @@ void m2d_free(void* handle, struct m2d_buf* buf)
 
 	arg.handle = buf->gem_handle;
 	if (!ioctl(h->fd, DRM_IOCTL_MODE_DESTROY_DUMB, &arg, sizeof(arg)) == 0) {
-		//TODO
+		err_msg("error: DRM_IOCTL_MODE_DESTROY_DUMB(%s)\n", strerror(errno));
 	}
 
 	free(buf);
