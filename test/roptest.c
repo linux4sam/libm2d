@@ -185,10 +185,10 @@ int main(int argc, char** argv)
 
 	rop(handle, src0, src1, src2, dst);
 
-	m2d_free(src0);
-	m2d_free(src1);
-	m2d_free(src2);
-	m2d_free(dst);
+	m2d_free(handle, src0);
+	m2d_free(handle, src1);
+	m2d_free(handle, src2);
+	m2d_free(handle, dst);
 	m2d_close(handle);
 
 	return 0;

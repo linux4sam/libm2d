@@ -565,7 +565,8 @@ struct m2d_buf *m2d_alloc_from_name(void* handle, uint32_t name)
 	return 0;
 }
 
-static void* create_dumb_buffer(int fd, int size, uint32_t* name)
+static void* create_dumb_buffer(int fd, int size, uint32_t* name,
+                                uint32_t* gem_handle)
 {
 	struct drm_mode_create_dumb args1;
 	struct drm_mode_map_dumb args2;
@@ -583,6 +584,7 @@ static void* create_dumb_buffer(int fd, int size, uint32_t* name)
 		err_msg("error: DRM_IOCTL_MODE_CREATE_DUMB\n");
 		return NULL;
 	}
+	*gem_handle = args1.handle;
 
 	memset(&args2, 0, sizeof(args2));
 	args2.handle = args1.handle;
@@ -617,10 +619,10 @@ static void* create_dumb_buffer(int fd, int size, uint32_t* name)
 struct m2d_buf* m2d_alloc(void* handle, uint32_t size)
 {
 	struct device* h = handle;
-	uint32_t name;
+	uint32_t name, gem_handle;
 	void* ptr;
 
-	ptr = create_dumb_buffer(h->fd, size, &name);
+	ptr = create_dumb_buffer(h->fd, size, &name, &gem_handle);
 	if (ptr) {
 		struct drm_gfx2d_gem_addr req;
 		req.name = name;
@@ -631,6 +633,7 @@ struct m2d_buf* m2d_alloc(void* handle, uint32_t size)
 			buf->paddr = req.paddr;
 			buf->vaddr = ptr;
 			buf->size = size;
+			buf->gem_handle = gem_handle;
 			return buf;
 		} else {
 			// TODO: free dumb buffer
@@ -645,10 +648,18 @@ struct m2d_buf* m2d_alloc_from_virt(void* handle, void* virt, uint32_t size)
 	return NULL;
 }
 
-void m2d_free(struct m2d_buf* buf)
+void m2d_free(void* handle, struct m2d_buf* buf)
 {
+	struct device* h = handle;
+	struct drm_mode_destroy_dumb arg;
+
 	if (buf->vaddr)
 		munmap(buf->vaddr, buf->size);
+
+	arg.handle = buf->gem_handle;
+	if (!ioctl(h->fd, DRM_IOCTL_MODE_DESTROY_DUMB, &arg, sizeof(arg)) == 0) {
+		//TODO
+	}
 
 	free(buf);
 }

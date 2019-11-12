@@ -223,6 +223,8 @@ extern "C"  {
 		uint32_t paddr;
 		/** Virtual, usually mmap()'ed address of the buffer. */
 		void* vaddr;
+        /** gem-handle needed to destroy the buffer. */
+        uint32_t gem_handle;
 	};
 
 	/**
@@ -270,7 +272,7 @@ extern "C"  {
 	/**
 	 * Free an allocated surface buffer.
 	 */
-	void m2d_free(struct m2d_buf* buf);
+	void m2d_free(void* handle, struct m2d_buf* buf);
 
 	/**
 	 * Wait for vsync from LCD controller.

@@ -92,8 +92,8 @@ int main(int argc, char** argv)
 		fps_frame();
 	}
 
-	m2d_free(src);
-	m2d_free(dst);
+	m2d_free(handle, src);
+	m2d_free(handle, dst);
 	m2d_close(handle);
 
 	return 0;

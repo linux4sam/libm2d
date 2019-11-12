@@ -83,7 +83,7 @@ int main(int argc, char** argv)
 		fps_frame();
 	}
 
-	m2d_free(buf);
+	m2d_free(handle, buf);
 	m2d_close(handle);
 
 	return 0;
