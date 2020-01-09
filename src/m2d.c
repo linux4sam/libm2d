@@ -91,6 +91,8 @@
 #define WFE0_OPCODE 28
 #define WFE0_IE 24
 
+#define M2D_AUTO_SUBMIT_THRESHOLD 512
+
 enum reg_id
 {
 	GFX2D_PA0 = 0,
@@ -119,8 +121,10 @@ struct device
 	/**
 	 * Command buffer. This is allocated to page size, but the kernel limits
 	 * to 128 words (512 bytes).
+	 * TODO: check this, seems to be 16kB - 1;
 	 */
-	void* cmdbuf;
+	uint32_t* cmdbuf;
+	void* cmdbuf_base;
 
 	/**
 	 * Used to cache the ldr instructions so consecutive commands are
@@ -165,25 +169,22 @@ static inline void word_write(uint32_t* word, uint32_t offset, uint32_t value)
 	*word |= (value << offset);
 }
 
-static int gen_ldr_cmd(struct device* h, uint32_t* buf,
-		       enum reg_id reg, uint32_t value)
+static void gen_ldr_cmd(struct device* h, enum reg_id reg, uint32_t value)
 {
-	int i = 0;
-
 	dbg_msg("gen_ldr_cmd %d=%d\n", reg, value);
 
 	assert(reg < 16);
 
 	if (h->reg_cache[reg] == value)
-		return i;
+		return;
 	h->reg_cache[reg] = value;
 
-	word_set(buf + i, LDR0_OPCODE, 0x8);
-	word_write(buf + i, LDR0_REG, reg);
-	word_write(buf + i, STR0_ARGS, 0);
-	++i;
-	word_set(buf + i, LDR1_DATA, value);
-	return ++i;
+	word_set(h->cmdbuf, LDR0_OPCODE, 0x8);
+	word_write(h->cmdbuf, LDR0_REG, reg);
+	word_write(h->cmdbuf, STR0_ARGS, 0);
+	h->cmdbuf++;
+	word_set(h->cmdbuf, LDR1_DATA, value);
+	h->cmdbuf++;
 }
 
 #if 0
@@ -209,130 +210,139 @@ static int gen_wfe_cmd(uint32_t* buf)
 	return ++i;
 }
 
-static int gen_fill_cmd(uint32_t* buf, enum m2d_transfer_dir dir,uint32_t dwidth,
-			uint32_t dheight, uint32_t dx, uint32_t dy,
-			uint32_t argb)
+static void gen_fill_cmd(struct device* h, enum m2d_transfer_dir dir,
+			 uint32_t dwidth, uint32_t dheight,
+			 uint32_t dx, uint32_t dy,
+			 uint32_t argb)
 {
-	int i = 0;
-
 	dbg_msg("gen_fill_cmd [%d,%d %d,%d]=%X\n",
 		dx, dy, dwidth, dheight, argb);
 
-	word_set(buf + i, FILL0_OPCODE, 0xB);
-	word_write(buf + i, FILL0_DIR, dir);
-	word_write(buf + i, FILL0_ARGS, 2);
-	++i;
-	word_set(buf + i, FILL1_WIDTH, dwidth-1);
-	word_write(buf + i, FILL1_HEIGHT, dheight-1);
-	++i;
-	word_set(buf + i, FILL2_DY0, dy);
-	word_write(buf + i, FILL2_DX0, dx);
-	++i;
-	word_set(buf + i, FILL3_ARGB, argb);
-	return ++i;
+	word_set(h->cmdbuf, FILL0_OPCODE, 0xB);
+	word_write(h->cmdbuf, FILL0_DIR, dir);
+	word_write(h->cmdbuf, FILL0_ARGS, 2);
+	h->cmdbuf++;
+	word_set(h->cmdbuf, FILL1_WIDTH, dwidth-1);
+	word_write(h->cmdbuf, FILL1_HEIGHT, dheight-1);
+	h->cmdbuf++;
+	word_set(h->cmdbuf, FILL2_DY0, dy);
+	word_write(h->cmdbuf, FILL2_DX0, dx);
+	h->cmdbuf++;
+	word_set(h->cmdbuf, FILL3_ARGB, argb);
+	h->cmdbuf++;
 }
 
-static int gen_copy_cmd(uint32_t* buf, enum m2d_transfer_dir dir,uint32_t dwidth,
-			uint32_t dheight, uint32_t dx, uint32_t dy,
-			uint32_t sx, uint32_t sy)
+static void gen_copy_cmd(struct device* h, enum m2d_transfer_dir dir,
+			 uint32_t dwidth, uint32_t dheight,
+			 uint32_t dx, uint32_t dy,
+			 uint32_t sx, uint32_t sy)
 {
-	int i = 0;
-
 	dbg_msg("gen_copy_cmd [%d,%d] -> [%d,%d %d,%d]\n",
 		sx, sy, dx, dy, dwidth, dheight);
 
-	word_set(buf + i, COPY0_OPCODE, 0xC);
-	word_write(buf + i, COPY0_HWT, 0);
-	word_write(buf + i, COPY0_DIR, dir);
-	word_write(buf + i, COPY0_ARGS, 2);
-	++i;
-	word_set(buf + i, COPY1_WIDTH, dwidth-1);
-	word_write(buf + i, COPY1_HEIGHT, dheight-1);
-	++i;
-	word_set(buf + i, COPY2_DY0, dy);
-	word_write(buf + i, COPY2_DX0, dx);
-	++i;
-	word_set(buf + i, COPY3_SY0, sy);
-	word_write(buf + i, COPY3_SX0, sx);
-	return ++i;
+	word_set(h->cmdbuf, COPY0_OPCODE, 0xC);
+	word_write(h->cmdbuf, COPY0_HWT, 0);
+	word_write(h->cmdbuf, COPY0_DIR, dir);
+	word_write(h->cmdbuf, COPY0_ARGS, 2);
+	h->cmdbuf++;
+	word_set(h->cmdbuf, COPY1_WIDTH, dwidth-1);
+	word_write(h->cmdbuf, COPY1_HEIGHT, dheight-1);
+	h->cmdbuf++;
+	word_set(h->cmdbuf, COPY2_DY0, dy);
+	word_write(h->cmdbuf, COPY2_DX0, dx);
+	h->cmdbuf++;
+	word_set(h->cmdbuf, COPY3_SY0, sy);
+	word_write(h->cmdbuf, COPY3_SX0, sx);
+	h->cmdbuf++;
 }
 
-static int gen_blend_cmd(uint32_t* buf, enum m2d_transfer_dir dir,uint32_t dwidth,
-			 uint32_t dheight, uint32_t dx, uint32_t dy,
-			 uint32_t sx0, uint32_t sy0, uint32_t sx1, uint32_t sy1,
-			 enum m2d_blend_func func,
-			 enum m2d_blend_factors dfact,
-			 enum m2d_blend_factors sfact)
+static void gen_blend_cmd(struct device* h, enum m2d_transfer_dir dir,
+			  uint32_t dwidth, uint32_t dheight,
+			  uint32_t dx, uint32_t dy,
+			  uint32_t sx0, uint32_t sy0, uint32_t sx1, uint32_t sy1,
+			  enum m2d_blend_func func,
+			  enum m2d_blend_factors dfact,
+			  enum m2d_blend_factors sfact)
 {
-	int i = 0;
-
 	dbg_msg("gen_blend_cmd [%d,%d] [%d,%d] -> [%d,%d %d,%d]\n",
 		sx0, sy0, sx1, sy1, dx, dy, dwidth, dheight);
 
-	word_set(buf + i, BLEND0_OPCODE, 0xD);
-	word_write(buf + i, BLEND0_DIR, dir);
-	word_write(buf + i, BLEND0_ARGS, 4);
-	++i;
-	word_set(buf + i, BLEND1_WIDTH, dwidth-1);
-	word_write(buf + i, BLEND1_HEIGHT, dheight-1);
-	++i;
-	word_set(buf + i, BLEND2_DY0, dy);
-	word_write(buf + i, BLEND2_DX0, dx);
-	++i;
-	word_set(buf + i, BLEND3_SY0, sy0);
-	word_write(buf + i, BLEND3_SX0, sx0);
-	++i;
-	word_set(buf + i, BLEND4_SY1, sy1);
-	word_write(buf + i, BLEND4_SX1, sx1);
-	++i;
+	word_set(h->cmdbuf, BLEND0_OPCODE, 0xD);
+	word_write(h->cmdbuf, BLEND0_DIR, dir);
+	word_write(h->cmdbuf, BLEND0_ARGS, 4);
+	h->cmdbuf++;
+	word_set(h->cmdbuf, BLEND1_WIDTH, dwidth-1);
+	word_write(h->cmdbuf, BLEND1_HEIGHT, dheight-1);
+	h->cmdbuf++;
+	word_set(h->cmdbuf, BLEND2_DY0, dy);
+	word_write(h->cmdbuf, BLEND2_DX0, dx);
+	h->cmdbuf++;
+	word_set(h->cmdbuf, BLEND3_SY0, sy0);
+	word_write(h->cmdbuf, BLEND3_SX0, sx0);
+	h->cmdbuf++;
+	word_set(h->cmdbuf, BLEND4_SY1, sy1);
+	word_write(h->cmdbuf, BLEND4_SX1, sx1);
+	h->cmdbuf++;
 	if ((func & 0xf) == M2D_BLEND_SPE) {
-		word_set(buf + i, BLEND5_SPE, func >> 4);
-		word_write(buf + i, BLEND5_FUNC, func & 0xf);
+		word_set(h->cmdbuf, BLEND5_SPE, func >> 4);
+		word_write(h->cmdbuf, BLEND5_FUNC, func & 0xf);
 	}
 	else {
-		word_set(buf + i, BLEND5_FUNC, func & 0xf);
+		word_set(h->cmdbuf, BLEND5_FUNC, func & 0xf);
 	}
-	word_write(buf + i, BLEND5_DFACT, dfact);
-	word_write(buf + i, BLEND5_SFACT, sfact);
-	return ++i;
+	word_write(h->cmdbuf, BLEND5_DFACT, dfact);
+	word_write(h->cmdbuf, BLEND5_SFACT, sfact);
+	h->cmdbuf++;
 }
 
-static int gen_rop_cmd(uint32_t* buf, enum m2d_transfer_dir dir,
-		       uint32_t dwidth, uint32_t dheight,
-		       uint32_t dx, uint32_t dy,
-		       uint32_t sx0, uint32_t sy0,
-		       uint32_t sx1, uint32_t sy1,
-		       uint32_t pmask,
-		       uint8_t ropl,
-		       uint8_t roph,
-		       enum m2d_rop_mode mode)
+static void gen_rop_cmd(struct device* h, enum m2d_transfer_dir dir,
+			uint32_t dwidth, uint32_t dheight,
+			uint32_t dx, uint32_t dy,
+			uint32_t sx0, uint32_t sy0,
+			uint32_t sx1, uint32_t sy1,
+			uint32_t pmask,
+			uint8_t ropl,
+			uint8_t roph,
+			enum m2d_rop_mode mode)
 {
-	int i = 0;
-
 	dbg_msg("gen_rop_cmd [%d,%d] [%d, %d] -> [%d,%d %d,%d]\n",
 		sx0, sy0, sx1, sy1, dx, dy, dwidth, dheight);
 
-	word_set(buf + i, ROP0_OPCODE, 0xE);
-	word_write(buf + i, ROP0_ARGS, 5);
-	++i;
-	word_set(buf + i, ROP1_WIDTH, dwidth-1);
-	word_write(buf + i, ROP1_HEIGHT, dheight-1);
-	++i;
-	word_set(buf + i, ROP2_DY0, dy);
-	word_write(buf + i, ROP2_DX0, dx);
-	++i;
-	word_set(buf + i, ROP3_SY0, sy0);
-	word_write(buf + i, ROP3_SX0, sx0);
-	++i;
-	word_set(buf + i, ROP4_SY1, sy1);
-	word_write(buf + i, ROP4_SX1, sx1);
-	++i;
-	word_set(buf + i, ROP5_PMASK, pmask);
-	++i;
-	word_set(buf + i, ROP6_ROPL, ropl);
-	word_write(buf + i, ROP6_ROPH, roph);
-	word_write(buf + i, ROP6_ROPM, mode);
-	return ++i;
+	word_set(h->cmdbuf, ROP0_OPCODE, 0xE);
+	word_write(h->cmdbuf, ROP0_ARGS, 5);
+	h->cmdbuf++;
+	word_set(h->cmdbuf, ROP1_WIDTH, dwidth-1);
+	word_write(h->cmdbuf, ROP1_HEIGHT, dheight-1);
+	h->cmdbuf++;
+	word_set(h->cmdbuf, ROP2_DY0, dy);
+	word_write(h->cmdbuf, ROP2_DX0, dx);
+	h->cmdbuf++;
+	word_set(h->cmdbuf, ROP3_SY0, sy0);
+	word_write(h->cmdbuf, ROP3_SX0, sx0);
+	h->cmdbuf++;
+	word_set(h->cmdbuf, ROP4_SY1, sy1);
+	word_write(h->cmdbuf, ROP4_SX1, sx1);
+	h->cmdbuf++;
+	word_set(h->cmdbuf, ROP5_PMASK, pmask);
+	h->cmdbuf++;
+	word_set(h->cmdbuf, ROP6_ROPL, ropl);
+	word_write(h->cmdbuf, ROP6_ROPH, roph);
+	word_write(h->cmdbuf, ROP6_ROPM, mode);
+	h->cmdbuf++;
+}
+
+static int m2d_auto_submit(struct device* h)
+{
+	struct drm_gfx2d_submit req;
+
+	req.size = h->cmdbuf - (uint32_t*)h->cmdbuf_base;
+	if (req.size > M2D_AUTO_SUBMIT_THRESHOLD) {
+		req.buf = (__u32)h->cmdbuf_base;
+		h->cmdbuf = h->cmdbuf_base;
+		return ioctl(h->fd, DRM_IOCTL_GFX2D_SUBMIT, &req, sizeof(req));
+	}
+
+	return 0;
 }
 
 int m2d_open(void **handle)
@@ -359,9 +369,10 @@ int m2d_open(void **handle)
 
 	page_size = getpagesize();
 
-	ret = posix_memalign(&h->cmdbuf, page_size, page_size);
+	ret = posix_memalign(&h->cmdbuf_base, page_size, page_size);
 	if (ret)
 		goto fail;
+	h->cmdbuf = h->cmdbuf_base;
 
 	*handle = h;
 
@@ -394,38 +405,40 @@ void m2d_close(void *handle)
 int m2d_fill(void *handle, uint32_t argb, struct m2d_surface *dst)
 {
 	struct device* h = handle;
-	struct drm_gfx2d_submit req;
-	uint32_t *buf = h->cmdbuf;
+	int ret;
 
-	buf += gen_ldr_cmd(h, buf, GFX2D_PA0, dst->buf->paddr);
-	buf += gen_ldr_cmd(h, buf, GFX2D_PITCH0, dst->pitch);
-	buf += gen_ldr_cmd(h, buf, GFX2D_CFG0, dst->format);
-	buf += gen_fill_cmd(buf, dst->dir, dst->width, dst->height,
-			    dst->x, dst->y, argb);
+	ret = m2d_auto_submit(h);
+	if (ret)
+		return ret;
 
-	req.size = (buf - (uint32_t*)h->cmdbuf);
-	req.buf = (__u32)h->cmdbuf;
-	return ioctl(h->fd, DRM_IOCTL_GFX2D_SUBMIT, &req, sizeof(req));
+	gen_ldr_cmd(h, GFX2D_PA0, dst->buf->paddr);
+	gen_ldr_cmd(h, GFX2D_PITCH0, dst->pitch);
+	gen_ldr_cmd(h, GFX2D_CFG0, dst->format);
+	gen_fill_cmd(h, dst->dir, dst->width, dst->height,
+		     dst->x, dst->y, argb);
+
+	return ret;
 }
 
 int m2d_copy(void *handle, struct m2d_surface* src, struct m2d_surface* dst)
 {
 	struct device* h = handle;
-	struct drm_gfx2d_submit req;
-	uint32_t *buf = h->cmdbuf;
+	int ret;
 
-	buf += gen_ldr_cmd(h, buf, GFX2D_PA0, dst->buf->paddr);
-	buf += gen_ldr_cmd(h, buf, GFX2D_PITCH0, dst->pitch);
-	buf += gen_ldr_cmd(h, buf, GFX2D_CFG0, dst->format);
-	buf += gen_ldr_cmd(h, buf, GFX2D_PA1, src->buf->paddr);
-	buf += gen_ldr_cmd(h, buf, GFX2D_PITCH1, src->pitch);
-	buf += gen_ldr_cmd(h, buf, GFX2D_CFG1, src->format);
-	buf += gen_copy_cmd(buf, dst->dir, dst->width, dst->height,
-			    dst->x, dst->y, src->x, src->y);
+	ret = m2d_auto_submit(h);
+	if (ret)
+		return ret;
 
-	req.size = (buf - (uint32_t*)h->cmdbuf);
-	req.buf = (__u32)h->cmdbuf;
-	return ioctl(h->fd, DRM_IOCTL_GFX2D_SUBMIT, &req, sizeof(req));
+	gen_ldr_cmd(h, GFX2D_PA0, dst->buf->paddr);
+	gen_ldr_cmd(h, GFX2D_PITCH0, dst->pitch);
+	gen_ldr_cmd(h, GFX2D_CFG0, dst->format);
+	gen_ldr_cmd(h, GFX2D_PA1, src->buf->paddr);
+	gen_ldr_cmd(h, GFX2D_PITCH1, src->pitch);
+	gen_ldr_cmd(h, GFX2D_CFG1, src->format);
+	gen_copy_cmd(h, dst->dir, dst->width, dst->height,
+		     dst->x, dst->y, src->x, src->y);
+
+	return 0;
 }
 
 int m2d_blend(void *handle, struct m2d_surface* src0,
@@ -434,29 +447,30 @@ int m2d_blend(void *handle, struct m2d_surface* src0,
 	      enum m2d_blend_func func)
 {
 	struct device* h = handle;
-	struct drm_gfx2d_submit req;
-	uint32_t *buf = h->cmdbuf;
+	int ret;
 
-	buf += gen_ldr_cmd(h, buf, GFX2D_PA0, dst->buf->paddr);
-	buf += gen_ldr_cmd(h, buf, GFX2D_PITCH0, dst->pitch);
-	buf += gen_ldr_cmd(h, buf, GFX2D_CFG0, dst->format);
-	buf += gen_ldr_cmd(h, buf, GFX2D_PA1, src0->buf->paddr);
-	buf += gen_ldr_cmd(h, buf, GFX2D_PITCH1, src0->pitch);
-	buf += gen_ldr_cmd(h, buf, GFX2D_CFG1, src0->format);
-	buf += gen_ldr_cmd(h, buf, GFX2D_PA2, src1->buf->paddr);
-	buf += gen_ldr_cmd(h, buf, GFX2D_PITCH2, src1->pitch);
-	buf += gen_ldr_cmd(h, buf, GFX2D_CFG2, src1->format);
-	buf += gen_blend_cmd(buf, dst->dir, dst->width, dst->height,
-			     dst->x, dst->y,
-			     src0->x, src0->y,
-			     src1->x, src1->y,
-			     func,
-			     dst->fact,
-			     src0->fact);
+	ret = m2d_auto_submit(h);
+	if (ret)
+		return ret;
 
-	req.size = (buf - (uint32_t*)h->cmdbuf);
-	req.buf = (__u32)h->cmdbuf;
-	return ioctl(h->fd, DRM_IOCTL_GFX2D_SUBMIT, &req, sizeof(req));
+	gen_ldr_cmd(h, GFX2D_PA0, dst->buf->paddr);
+	gen_ldr_cmd(h, GFX2D_PITCH0, dst->pitch);
+	gen_ldr_cmd(h, GFX2D_CFG0, dst->format);
+	gen_ldr_cmd(h, GFX2D_PA1, src0->buf->paddr);
+	gen_ldr_cmd(h, GFX2D_PITCH1, src0->pitch);
+	gen_ldr_cmd(h, GFX2D_CFG1, src0->format);
+	gen_ldr_cmd(h, GFX2D_PA2, src1->buf->paddr);
+	gen_ldr_cmd(h, GFX2D_PITCH2, src1->pitch);
+	gen_ldr_cmd(h, GFX2D_CFG2, src1->format);
+	gen_blend_cmd(h, dst->dir, dst->width, dst->height,
+		      dst->x, dst->y,
+		      src0->x, src0->y,
+		      src1->x, src1->y,
+		      func,
+		      dst->fact,
+		      src0->fact);
+
+	return 0;
 }
 
 int m2d_rop(void *handle, enum m2d_rop_mode mode,
@@ -464,9 +478,11 @@ int m2d_rop(void *handle, enum m2d_rop_mode mode,
 	    uint8_t ropl, uint8_t roph)
 {
 	struct device* h = handle;
-	struct drm_gfx2d_submit req;
-	uint32_t *buf = h->cmdbuf;
-	int x;
+	int ret, x;
+
+	ret = m2d_auto_submit(h);
+	if (ret)
+		return ret;
 
 	switch (mode)
 	{
@@ -485,25 +501,23 @@ int m2d_rop(void *handle, enum m2d_rop_mode mode,
 	}
 
 	for (x = 0; x < nsurfaces;x++) {
-		buf += gen_ldr_cmd(h, buf, GFX2D_PA0 + (x * 3), sp[x]->buf->paddr);
+		gen_ldr_cmd(h, GFX2D_PA0 + (x * 3), sp[x]->buf->paddr);
 		/* no PITCH/CFG for surface 3 */
 		if (x != 3) {
-			buf += gen_ldr_cmd(h, buf, GFX2D_PITCH0 + (x * 3), sp[x]->pitch);
-			buf += gen_ldr_cmd(h, buf, GFX2D_CFG0 + (x * 3), sp[x]->format);
+			gen_ldr_cmd(h, GFX2D_PITCH0 + (x * 3), sp[x]->pitch);
+			gen_ldr_cmd(h, GFX2D_CFG0 + (x * 3), sp[x]->format);
 		}
 	}
 
-	buf += gen_rop_cmd(buf, sp[0]->dir,
-			   sp[0]->width, sp[0]->height,
-			   sp[0]->x, sp[0]->y,
-			   sp[1]->x, sp[1]->y,
-			   sp[2]->x, sp[2]->y,
-			   (mode == ROP_MODE_ROP4) ? sp[3]->buf->paddr : 0,
-			   ropl, roph, mode);
+	gen_rop_cmd(h, sp[0]->dir,
+		    sp[0]->width, sp[0]->height,
+		    sp[0]->x, sp[0]->y,
+		    sp[1]->x, sp[1]->y,
+		    sp[2]->x, sp[2]->y,
+		    (mode == ROP_MODE_ROP4) ? sp[3]->buf->paddr : 0,
+		    ropl, roph, mode);
 
-	req.size = (buf - (uint32_t*)h->cmdbuf);
-	req.buf = (__u32)h->cmdbuf;
-	return ioctl(h->fd, DRM_IOCTL_GFX2D_SUBMIT, &req, sizeof(req));
+	return 0;
 }
 
 static void* map_gem(int fd, uint32_t name, uint32_t* size)
