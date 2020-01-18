@@ -694,7 +694,19 @@ int m2d_wfe(void *handle)
 int m2d_flush(void *handle)
 {
 	struct device* h = handle;
+	struct drm_gfx2d_submit req;
+	int ret;
+
 	dbg_msg("flush\n");
+	req.size = h->cmdbuf - (uint32_t*)h->cmdbuf_base;
+	if (req.size) {
+		req.buf = (__u32)h->cmdbuf_base;
+		h->cmdbuf = h->cmdbuf_base;
+		ret = ioctl(h->fd, DRM_IOCTL_GFX2D_SUBMIT, &req, sizeof(req));
+		if (ret)
+			return ret;
+	}
+
 	return ioctl(h->fd, DRM_IOCTL_GFX2D_FLUSH);
 }
 
