@@ -29,6 +29,8 @@ int m2d_format_pitch(uint32_t format, uint32_t width)
 {
 	switch (format)
 	{
+	case M2D_A8:
+		return width;
 	case M2D_ARGB16:
 	case M2D_RGB16:
 	case M2D_RGBT16:
