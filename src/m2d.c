@@ -394,7 +394,7 @@ fail:
 void m2d_close(void *handle)
 {
 	struct device* h = handle;
-	m2d_flush(handle);
+
 	close(h->fd);
 	free(h->cmdbuf_base);
 	free(h);
