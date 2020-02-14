@@ -572,6 +572,7 @@ struct m2d_buf *m2d_alloc_from_name(void* handle, uint32_t name)
 			buf->paddr = req.paddr;
 			buf->size = size;
 			buf->vaddr = ptr;
+			buf->gem_handle = 0;
 			return buf;
 		}
 	}
@@ -670,9 +671,11 @@ void m2d_free(void* handle, struct m2d_buf* buf)
 	if (buf->vaddr)
 		munmap(buf->vaddr, buf->size);
 
-	arg.handle = buf->gem_handle;
-	if (!ioctl(h->fd, DRM_IOCTL_MODE_DESTROY_DUMB, &arg, sizeof(arg)) == 0) {
-		err_msg("error: DRM_IOCTL_MODE_DESTROY_DUMB(%s)\n", strerror(errno));
+	if (buf->gem_handle) {
+		arg.handle = buf->gem_handle;
+		if (!ioctl(h->fd, DRM_IOCTL_MODE_DESTROY_DUMB, &arg, sizeof(arg)) == 0) {
+			err_msg("error: DRM_IOCTL_MODE_DESTROY_DUMB(%s)\n", strerror(errno));
+		}
 	}
 
 	free(buf);
