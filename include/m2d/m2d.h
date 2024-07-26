@@ -1,6 +1,7 @@
 /*
- * Copyright (C) 2018 Microchip Technology Inc.  All rights reserved.
- * Joshua Henderson <joshua.henderson@microchip.com>
+ * Copyright (C) 2024 Microchip Technology Inc.  All rights reserved.
+ *
+ * SPDX-License-Identifier: Apache-2.0
  */
 #ifndef __M2D_H__
 #define __M2D_H__
@@ -9,7 +10,12 @@
  * @brief Microchip 2D API
  */
 
+#include <m2d/version.h>
+
+#include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
+#include <time.h>
 
 #define M2D_VERSION_MAJOR   1
 #define M2D_VERSION_MINOR   0
@@ -18,334 +24,351 @@
 extern "C"  {
 #endif
 
-	/**
-	 * Supported surface formats.
-	 */
-	enum m2d_format
-	{
-		/** 4-bit indexed color, with 4-bit alpha value */
-		M2D_A4IDX4 = 0,
-		/** 8 bits per pixel alpha, with user-defined constant color */
-		M2D_A8 = 1,
-		/** 8 bits indexed color, uses the Color Look-Up Table to expand to true color */
-		M2D_IDX8 = 2,
-		/** 8-bit indexed color, with 8-bit alpha value */
-		M2D_A8IDX8 = 3,
-		/** 12 bits per pixel, 4 bits per color channel */
-		M2D_RGB12 = 4,
-		/** 16 bits per pixel with 4-bit width alpha value, and 4 bits per color channel */
-		M2D_ARGB16 = 5,
-		/** 15 bits per pixel, 5 bits per color channel */
-		M2D_RGB15 = 6,
-		/** 16 bits per pixel, 5 bits for the red and blue channels and 6 bits for the green channel */
-		M2D_TRGB16 = 7,
-		/** 16 bits per pixel, with 1 bit for transparency and 5 bits for color channels */
-		M2D_RGBT16 = 8,
-		/** 16 bits per pixel, 5 bits for the red and blue channels and 6 bits for the green channel */
-		M2D_RGB16 = 9,
-		/** 24 bits per pixel, 8 bits for alpha and color channels */
-		M2D_RGB24 = 10,
-		/** 32 bits per pixel, 8 bits for alpha and color channels */
-		M2D_ARGB32 = 11,
-		/** 32 bits per pixel, 8 bits for alpha and color channels */
-		M2D_RGBA32 = 12,
+typedef int dim_t;
 
-		/* format aliases */
-		M2D_RGB5551 = M2D_RGBT16,
-		M2D_RGB1555 = M2D_TRGB16,
-		M2D_ARGB8888 = M2D_ARGB32,
-		M2D_RGBA8888 = M2D_RGBA32,
-	};
+enum m2d_pixel_format
+{
+    M2D_PF_ARGB8888,
+    M2D_PF_RGB565,
+    M2D_PF_A8,
+};
 
-	/**
-	 * Source and destination blend factors used by m2d_blend().
-	 */
-	enum m2d_blend_factors
-	{
-		/** @f[ (0,0,0,0) @f] */
-		M2D_ZERO = 0,
-		/** @f[ (1,1,1,1) @f] */
-		M2D_ONE = 1,
-		/** @f[ (A_s,R_s,G_s,B_s) @f] */
-		M2D_SRC_COLOR = 2,
-		/** @f[ (1,1,1,1) - (A_s,R_s,G_s,B_s) @f] */
-		M2D_ONE_MINUS_SRC_COLOR = 3,
-		/** @f[ (A_d,R_d,G_d,B_d) @f] */
-		M2D_DST_COLOR = 4,
-		/** @f[ (1,1,1,1)-(A_d,R_d,G_d,B_d) @f] */
-		M2D_ONE_MINUS_DST_COLOR = 5,
-		/** @f[ (A_s,A_s,A_s,A_s) @f] */
-		M2D_SRC_ALPHA = 6,
-		/** @f[ (1,1,1,1)-(A_s,A_s,A_s,A_s) @f] */
-		M2D_ONE_MINUS_SRC_ALPHA = 7,
-		/** @f[ (A_d,A_d,A_d,A_d) @f] */
-		M2D_DST_ALPHA = 8,
-		/** @f[ (1,1,1,1)-(A_d,A_d,A_d,A_d) @f] */
-		M2D_ONE_MINUS_DST_ALPHA = 9,
-		/** @f[ (A_c,R_c,G_c,B_c) @f] */
-		M2D_CONSTANT_COLOR = 10,
-		/** @f[ (1,1,1,1) - (A_c,R_c,G_c,B_c) @f] */
-		M2D_ONE_MINUS_CONSTANT_COLOR = 11,
-		/** @f[ (A_c,A_c,A_c,A_c) @f] */
-		M2D_CONSTANT_ALPHA = 12,
-		/** @f[ (1,1,1,1)-(A_c,A_c,A_c,A_c) @f] */
-		M2D_ONE_MINUS_CONSTANT_ALPHA = 13,
-		/** @f[ (1,i,i,i) @f] where i is equal to the minimum between @f[ A_s @f] and @f[ 1-A_d @f] */
-		M2D_SRC_ALPHA_SATURATE = 14,
-	};
+/**
+ * Convert an 'enum m2d_pixel_format' into a string.
+ *
+ * @param[in] format The pixel format.
+ * @return the string representation of the pixel format.
+ */
+const char* m2d_format_name(enum m2d_pixel_format format);
 
-	/**
-	 * Raster operation modes.
-	 */
-	enum m2d_rop_mode
-	{
+struct m2d_buffer;
 
-		/** ROP2 mode */
-		ROP_MODE_ROP2 = 0,
-		/** ROP3 mode */
-		ROP_MODE_ROP3 = 1,
-		/** ROP4 mode */
-		ROP_MODE_ROP4 = 2,
-	};
+/**
+ * Create an handle to the GPU.
+ */
+int m2d_init();
 
-	/**
-	 * Blend functions used by m2d_blend().
-	 */
-	enum m2d_blend_func
-	{
-		/** @f[ C_f = S*C_s + D*C_d @f] */
-		M2D_BLEND_ADD = 0,
-		/** @f[ C_f = S*C_s - D*C_d @f] */
-		M2D_BLEND_SUBTRACT = 1,
-		/** @f[ C_f = D*C_d - S*C_s @f] */
-		M2D_BLEND_REVERSE = 2,
-		/** @f[ C_f = min(C_s,C_d) @f] */
-		M2D_BLEND_MIN = 3,
-		/** @f[ C_f = max(C_s,C_d) @f] */
-		M2D_BLEND_MAX = 4,
-		/** Special Blending Functions */
-		M2D_BLEND_SPE = 5,
+/**
+ * Close
+ */
+void m2d_cleanup();
 
-		/** @f[ max(src1, src2) @f] */
-		M2D_BLEND_SPE_LIGHTEN = M2D_BLEND_SPE | (1<<4),
-                /** @f[ min(src1, src2) @f] */
-		M2D_BLEND_SPE_DARKEN = M2D_BLEND_SPE | (1<<5),
-		/** @f[ (src1 * src2) / 255 @f] */
-		M2D_BLEND_SPE_MULTIPLY = M2D_BLEND_SPE | (1<<6),
-		/** @f[ (src1 + src2) / 2 @f] */
-		M2D_BLEND_SPE_AVERAGE = M2D_BLEND_SPE | (1<<7),
-		/** @f[ src1 + src2 (saturated) @f] */
-		M2D_BLEND_SPE_ADD = M2D_BLEND_SPE | (1<<8),
-		/** @f[ src1 + src2 - 255 (saturated) @f] */
-		M2D_BLEND_SPE_SUBTRACT = M2D_BLEND_SPE | (1<<9),
-		/** @f[ abs(src1 - src2) @f] */
-		M2D_BLEND_SPE_DIFFERENCE = M2D_BLEND_SPE | (1<<10),
-		/** @f[ 255 - abs(255 - src1 - src2) @f] */
-		M2D_BLEND_SPE_NEGATION = M2D_BLEND_SPE | (1<<11),
-		/** @f[ 255 - (((255 - src1) * (255 - src2)) / 256) @f] */
-		M2D_BLEND_SPE_SCREEN = M2D_BLEND_SPE | (1<<12),
-		/** @f[ (src2 < 128) ? (2 * src1 * src2 / 255) : (255 - 2 * (255 - src1) * (255 - src2) / 255) @f] */
-		M2D_BLEND_SPE_OVERLAY = M2D_BLEND_SPE | (1<<13),
-		/** @f[ (src2 == 255) ? src2 : min(255, ((src1 << 8) / (255 - src2)) @f] */
-		M2D_BLEND_SPE_DODGE = M2D_BLEND_SPE | (1<<14),
-		/** @f[ (src2 == 0) ? src2 : max(0, (255 - ((255 - src1) << 8 ) / src2)))) @f] */
-		M2D_BLEND_SPE_BURN = M2D_BLEND_SPE | (1<<15),
-		/** @f[ (src2 == 255) ? src2 : min(255, (src1 * src1 / (255 - src2))) @f] */
-		M2D_BLEND_SPE_REFLECT = M2D_BLEND_SPE | (1<<16),
-		/** @f[ (src1 == 255) ? src1 : min(255, (src2 * src2 / (255 - src1))) @f] */
-		M2D_BLEND_SPE_GLOW = M2D_BLEND_SPE | (1<<17),
-	};
+/**
+ * Allocate a new DRM GEM object to share a memory region between the userspace application and the GPU.
+ *
+ * @param[in] width The width in pixel of the memory region to allocate.
+ * @param[in] height The height in pixel of the memory region to allocate.
+ * @param[in] pixel_format The pixel format of the memory region to allocate.
+ * @param[in] stride The size in bytes between two consecutive rows in the memory region.
+ * @return a pointer to a 'struct m2d_buffer' that represents the allocated memory region.
+ */
+struct m2d_buffer* m2d_alloc(size_t width, size_t height, enum m2d_pixel_format format, size_t stride);
 
-	/**
-	 * Transfer direction selection.
-	 */
-	enum m2d_transfer_dir
-	{
-		/** Horizontal forward, vertical forward */
-		M2D_XY00 = 0,
-		/** Horizontal forward, vertical backward */
-		M2D_XY01 = 1,
-		/** Horizontal backward, vertical forward */
-		M2D_XY10 = 2,
-		/** Horizontal backward, vertical backward */
-		M2D_XY11 = 3,
-	};
+/**
+ * width: The number of pixels per row.
+ * height: The number of pixels per columns (also the number of rows).
+ * format: How pixels are encoded in memory.
+ * stride: The size in bytes between two consecutive rows in memory.
+ * fd: The DRM PRIME file descriptor for the DRM GEM object to import.
+ * cpu_addr: The virtual address in the userspace process memory map for the
+ *           DRM GEM object.
+ */
+struct m2d_import_desc {
+	size_t width;
+	size_t height;
+	enum m2d_pixel_format format;
+	size_t stride;
 
-	/**
-	 * A surface operation definition.
-	 */
-	struct m2d_surface
-	{
-		/** Format for the surface. */
-		enum m2d_format format;
-		/** Buffer for the surface. */
-		struct m2d_buf* buf;
-		/** Pitch of the surface */
-		int pitch;
+	int fd;
+	void* cpu_addr; /* imported DRM GEM object can't be mmap'ed. */
+};
 
-		/**
-		 * X coordinate of the operation, not to be confused with the
-		 * X coordinate of the surface.
-		 */
-		int x;
-		/**
-		 * Y coordinate of the operation, not to be confused with the
-		 * Y coordinate of the surface.
-		 */
-		int y;
-		/**
-		 * Width of the operation, not to be confused with the
-		 * width of the surface.
-		 */
-		int width;
-		/**
-		 * Height of the operation, not to be confused with the
-		 * height of the surface.
-		 */
-		int height;
+/**
+ * Import a DRM GEM object from a DRM PRIME file descriptor.
+ *
+ * Typically, the DRM PRIME file descriptor is obtained from the atmel_hlcdc
+ * driver to export a DRM GEM object used as a frame buffer.
+ *
+ * @param[in] desc The description of the DRM GEM object to import.
+ * @return a pointer to a 'struct m2d_buffer' that represents the allocated
+ *         memory region.
+ */
+struct m2d_buffer* m2d_import(const struct m2d_import_desc* desc);
 
-		/**  Direction for the transfer. */
-		enum m2d_transfer_dir dir;
-		/** When blending, the blending factor for this surface (either dst or src). */
-		enum m2d_blend_factors fact;
-	};
+/**
+ * Release a memory region created with either @m2d_alloc() or @m2d_import().
+ *
+ * @param[in] buf The memory region to release.
+ */
+void m2d_free(struct m2d_buffer* buf);
 
-	/**
-	 * A buffer, which can be assigned to a surface.
-	 */
-	struct m2d_buf
-	{
-		/** Size of the buffer. */
-		uint32_t size;
-		/** GEM name. */
-		uint32_t name;
-		/** Physical address of the buffer. */
-		uint32_t paddr;
-		/** Virtual, usually mmap()'ed address of the buffer. */
-		void* vaddr;
-        /** gem-handle needed to destroy the buffer. */
-        uint32_t gem_handle;
-	};
+/**
+ * Make the CPU claim the ownership of the DRM GEM object associated with @buf.
+ *
+ * @param[in] buf A pointer to a 'struct m2d_buffer'.
+ * @param[in] timeout A pointer to a 'const struct timespec'.
+ * @return 0 if successfull, -1 otherwise.
+ */
+int m2d_sync_for_cpu(struct m2d_buffer* buf, const struct timespec* timeout);
 
-	/**
-	 * Open the device and get a handle.
-	 *
-	 * @param handle Pointer to handle to the allocated m2d instance.
-	 * @return 0 on success, non-zero on error.
-	 */
-	int m2d_open(void** handle);
+/**
+ * Make the GPU claim the ownership of the DRM GEM object associated with @buf.
+ *
+ * @param[in] buf A pointer to a 'struct m2d_buffer'.
+ */
+void m2d_sync_for_gpu(struct m2d_buffer* buf);
 
-	/**
-	 * Close the device and free any resources.
-	 *
-	 * @param handle Handle to the m2d instance.
-	 */
-	void m2d_close(void* handle);
+/**
+ * Get the virtual address in the userspace process memory map for the DRM GEM
+ * object associated with @buf.
+ *
+ * @param[in] buf A pointer to a 'struct m2d_buffer'.
+ * @return the virtual address for @buf and its associated DRM GEM object.
+ */
+void* m2d_get_data(struct m2d_buffer* buf);
 
-	/**
-	 * Allocate a new surface buffer given the specified size.
-	 *
-	 * @param handle Handle to the m2d instance.
-	 * @param size Size in bytes.
-	 * @return NULL on error.
-	 */
-	struct m2d_buf* m2d_alloc(void* handle, uint32_t size);
+/**
+ * Wait for all queued operations/commands involving @buf to complete.
+ *
+ * @param[in] buf A pointer to a 'const struct m2d_buffer'.
+ * @param[in] timeout A pointer to a 'const struct timespec'
+ * @return 0 if successfull, -1 otherwise.
+ */
+int m2d_wait(const struct m2d_buffer* buf, const struct timespec* timeout);
 
-	/**
-	 * Allocate a new surface buffer with a pre-existing GEM name.
-	 *
-	 * @param handle Handle to the m2d instance.
-	 * @param name GEM object name.
-	 * @return NULL on error.
-	 */
-	struct m2d_buf* m2d_alloc_from_name(void* handle, uint32_t name);
+/**
+ * Set the target surface in the current renderer state.
+ *
+ * @param[in] buf A pointer to the 'struct m2d_buffer' to be used as the GPU
+ * target surface. The target surface is where the GPU draws; it is the result
+ * of the GPU operation. Hence, it must not be NULL.
+ */
+void m2d_set_target(struct m2d_buffer* buf);
 
-	/**
-	 * Allocate a new surface buffer with a pre-existing virtual address.
-	 *
-	 * @param handle Handle to the m2d instance.
-	 * @param virt Virtual address.
-	 * @return NULL on error.
-	 */
-	struct m2d_buf* m2d_alloc_from_virt(void* handle, void* virt, uint32_t size);
+/**
+ * Identifiers for source surfaces.
+ *
+ * - M2D_SRC: the only source for a copy operation the source surface for
+ *            blending or ROP.
+ * - M2D_DST: the destination surface for blending or ROP.
+ * - M2D_MSK: the mask for ROP.
+ */
+enum m2d_source_id
+{
+    M2D_SRC,
+    M2D_DST,
+    M2D_MSK,
 
-	/**
-	 * Free an allocated surface buffer.
-	 */
-	void m2d_free(void* handle, struct m2d_buf* buf);
+    M2D_MAX_SOURCES
+};
 
-	/**
-	 * Wait for vsync from LCD controller.
-	 *
-	 * @param handle Handle to the m2d instance.
-	 * @return 0 on success, non-zero on error.
-	 * @note You must call m2d_flush() to submit any pending requests.
-	 */
-	int m2d_wfe(void* handle);
+const char* m2d_source_name(enum m2d_source_id);
 
-	/**
-	 * Fill a destination surface with the given ARGB value.
-	 *
-	 * @param handle Handle to the m2d instance.
-	 * @return 0 on success, non-zero on error.
-	 * @note You must call m2d_flush() to submit any pending requests.
-	 */
-	int m2d_fill(void* handle, uint32_t argb, struct m2d_surface* dst);
+/**
+ * Set the source surface @index in the current renderer state.
+ *
+ * @param[in] id The id of the source surface to set.
+ * @param[in] buf A pointer to the 'struct m2d_buffer' where pixels are read from
+ * @param[in] x The origin x coordinate of this source surface in the target
+ *              surface space coordinate.
+ * @param[in] y The origin y coordiante of this source surface in the target
+ *              surface space coordinate.
+ *
+ * @note Pixels from the source surface @index are read from the @buf
+ *              'struct m2d_buffer' as if the origin of the source surface
+ *              were positioned at point (@x, @y) in the target surface space.
+ */
+void m2d_set_source(enum m2d_source_id id, struct m2d_buffer* buf, dim_t x, dim_t y);
 
-	/**
-	 * Copy a source surface to a destination surface.
-	 *
-	 * @param handle Handle to the m2d instance.
-	 * @return 0 on success, non-zero on error.
-	 * @note You must call m2d_flush() to submit any pending requests.
-	 */
-	int m2d_copy(void* handle, struct m2d_surface* src,
-		     struct m2d_surface* dst);
+/**
+ * Enable/disable the source surface @index in the current renderer state.
+ *
+ * @param[in] id The id of the source surface to enable/disable.
+ * @param[in] enabled The boolean telling where input pixels are read from:
+ *            - true: one or some 'struct m2d_buffer' set by @m2d_set_source();
+ *                    The actual number of sources depends on the operation,
+ *                    hence on @m2d_blend_enable() for instance.
+ *             or
+ *            - false: the constant source color set by @m2d_set_source_color()
+ */
+void m2d_source_enable(enum m2d_source_id id, bool enabled);
 
-	/**
-	 * Blend 2 source surfaces into a destination surface.
-	 *
-	 * @param handle Handle to the m2d instance.
-	 * @return 0 on success, non-zero on error.
-	 * @note You must call m2d_flush() to submit any pending requests.
-	 */
-	int m2d_blend(void* handle, struct m2d_surface* src0,
-		      struct m2d_surface* src1,
-		      struct m2d_surface* dst,
-		      enum m2d_blend_func func);
+/**
+ * Set the constant source color in the current renderer state.
+ * red == green == blue == alpha == 255 disables the pre-multiplication.
+ *
+ * For GFX2D:
+ * FILL operation: fill the destination surface with the constant source color.
+ * BLEND operation: pre-multiply the source surface with the constant source color, if not {255, 255, 255, 255}.
+ * COPY operation: unused.
+ *
+ * @param[in] red The red component of the constant source color.
+ * @param[in] green The green component of the constant source color.
+ * @param[in] blue The blue component of the constant source color.
+ * @param[in] alpha The alpha component of the constant source color.
+ */
+void m2d_source_color(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha);
 
-	/**
-	 * Raster operation from 1 to 3 source surfaces, into a destination
-	 * surface.
-	 *
-	 * @param handle Handle to the m2d instance.
-	 * @return 0 on success, non-zero on error.
-	 * @note You must call m2d_flush() to submit any pending requests.
-	 */
-	int m2d_rop(void* handle, enum m2d_rop_mode mode,
-		    struct m2d_surface* sp[], int nsurfaces,
-		    uint8_t ropl, uint8_t roph);
+/**
+ * Set the constant blend color in the current renderer state.
+ *
+ * @param[in] red The red component of the constant blend color.
+ * @param[in] green The green component of the constant blend color.
+ * @param[in] blue The blue component of the constant blend color.
+ * @param[in] alpha The alpha component of the constant blend color.
+ */
+void m2d_blend_color(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha);
 
-	/**
-	 * Flush any pending requests to the GPU.
-	 *
-	 * Submitted requests are always buffered.  This causes the GPU to act
-	 * on any pending request.
-	 *
-	 * @param handle Handle to the m2d instance.
-	 * @return 0 on success, non-zero on error.
-	 * @note This may block if the internal buffer is full.
-	 */
-	int m2d_flush(void* handle);
+/**
+ * Enable/disable blending mode in the current renderer state.
+ *
+ * @param[in] enabled The boolean telling whether the blending mode should be either enabled (true) or disabled (false).
+ */
+void m2d_blend_enable(bool enabled);
 
-	/**
-	 * Get the internal DRI file descriptor.
-	 *
-	 * @param handle Handle to the m2d instance.
-	 * @return < 0 on error, otherwise the file descriptor.
-	 */
-	int m2d_fd(void* handle);
+/**
+ * Specify the equation for the rgb and alpha components.
+ * s: the source factor ('src_rgb_factor' for rgb components, 'src_alpha_factor' for the alpha component) see @m2d_blend_factors().
+ * d: the destination factor ('dst_rgb_factor' for rgb components, 'dst_alpha_factor' for the alpha component) see @m2d_blend_factors().
+ * S: the source color component (red, green, blue or alpha component).
+ * D: the destination color component (red, green, blue or alpha component).
+ *
+ * M2D_FUNC_ADD:                O = s * S + d * D
+ * M2D_FUNC_SUBSTRACT:          O = s * S - d * D
+ * M2D_FUNC_REVERSE_SUBTRACT:   O = d * D - s * S
+ * M2D_FUNC_MIN:                O = min(S, D)
+ * M2D_FUNC_MAX:                O = max(S, D)
+ */
+enum m2d_blend_function {
+	M2D_FUNC_ADD,
+	M2D_FUNC_SUBTRACT,
+	M2D_FUNC_REVERSE,
+	M2D_FUNC_MIN,
+	M2D_FUNC_MAX,
+};
 
+/**
+ * Convert an 'enum m2d_blend_function' into a string.
+ *
+ * @paran[in] factor The blend function.
+ * @return the string representation of the blend function.
+ */
+const char* m2d_blend_function_name(enum m2d_blend_function function);
+
+/**
+ * Change the blend functions in the current renderer state.
+ *
+ * @param[in] rgb_func The function for rgb components.
+ * @param[in] alpha_func The function for the alpha component (ignored for GFX2D: use the same as rgb_func).
+ */
+void m2d_blend_functions(enum m2d_blend_function rgb_func, enum m2d_blend_function alpha_func);
+
+enum m2d_blend_factor {
+	M2D_BLEND_ZERO,
+	M2D_BLEND_ONE,
+	M2D_BLEND_SRC_COLOR,
+	M2D_BLEND_ONE_MINUS_SRC_COLOR,
+	M2D_BLEND_DST_COLOR,
+	M2D_BLEND_ONE_MINUS_DST_COLOR,
+	M2D_BLEND_SRC_ALPHA,
+	M2D_BLEND_ONE_MINUS_SRC_ALPHA,
+	M2D_BLEND_DST_ALPHA,
+	M2D_BLEND_ONE_MINUS_DST_ALPHA,
+	M2D_BLEND_CONSTANT_COLOR,
+	M2D_BLEND_ONE_MINUS_CONSTANT_COLOR,
+	M2D_BLEND_CONSTANT_ALPHA,
+	M2D_BLEND_ONE_MINUS_CONSTANT_ALPHA,
+	M2D_BLEND_SRC_ALPHA_SATURATE,
+};
+
+/**
+ * Convert an 'enum m2d_blend_factor' into a string.
+ *
+ * @paran[in] factor The blend factor.
+ * @return the string representation of the blend factor.
+ */
+const char* m2d_blend_factor_name(enum m2d_blend_factor factor);
+
+/**
+ * Change the blend factors in the current renderer state.
+ *
+ * @param[in] src_rgb_factor
+ * @param[in] dst_rgb_factor
+ * @param[in] src_alpha_factor
+ * @param[in] dst_alpha_factor
+ *
+ * @note factors are ignored when either M2D_FUNC_MIN or M2D_FUNC_MAX function
+ *       is selected by @m2d_blend_functions().
+ */
+void m2d_blend_factors(enum m2d_blend_factor src_rgb_factor,
+		       enum m2d_blend_factor dst_rgb_factor,
+		       enum m2d_blend_factor src_alpha_factor,
+		       enum m2d_blend_factor dst_alpha_factor);
+
+/**
+ * The rectangle definition for @m2d_draw_rectangles().
+ *
+ * x: the x coordinates of the rectangle origin in the target surface space.
+ * y: the y coordinates of the rectangle origin in the target surface space.
+ * w: the width in pixel of the rectangle in the target surface space.
+ * h: the height in pixel of the rectangle in the target surface space.
+ */
+struct m2d_rectangle {
+	dim_t x;
+	dim_t y;
+	dim_t w;
+	dim_t h;
+};
+
+/**
+ * Draw rectangles according to the current renderer state.
+ * This is asynchronous (non-blocking).
+ *
+ * For instance, with GFX2D,
+ * {@m2d_source_enable() , @m2d_blend_enable()}:
+ * {false , false} : FILL operation with constant source color.
+ * {false , true}  : Not supported.
+ * {true , false}  : COPY operation.
+ * {true , true}   : BLEND operation.
+ *
+ * @param[in] rects The array of rectangles to draw.
+ * @param[in] num_rects The number of rectangles in the 'rects' array.
+ */
+void m2d_draw_rectangles(const struct m2d_rectangle* rects, size_t num_rects);
+
+
+/* LINES OPERATIONS ARE NOT SUPPORTED BY THE GFX2D */
+
+/**
+ * The line definition for @m2d_draw_lines().
+ *
+ * A line between point {start_x, start_y} and point {end_x, end_y}.
+ */
+struct m2d_line {
+	dim_t start_x;
+	dim_t start_y;
+	dim_t end_x;
+	dim_t end_y;
+};
+
+/**
+ * Set the line width for @m2d_draw_lines() in the current renderer state.
+ *
+ * @param[in] width The line width in pixels.
+ */
+void m2d_line_width(dim_t width);
+
+/**
+ * Draw lines according to the current renderer state.
+ * This is asynchronous (non-blocking).
+ *
+ * The line color is set by @m2d_source_color().
+ * The line width is set by @m2d_line_width().
+ *
+ * @param[in] lines The array of lines to draw.
+ * @param[in] num_lines The numbers of lines in the 'lines' array.
+ */
+void m2d_draw_lines(const struct m2d_line* lines, size_t num_lines);
 
 #ifdef __cplusplus
 }

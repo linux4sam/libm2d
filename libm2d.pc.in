@@ -7,6 +7,5 @@ Name: libm2d
 Description: Microchip 2D Graphics API
 Version: @PACKAGE_VERSION@
 Libs: -L${libdir} -lm2d
-Cflags: -I${includedir} -I${includedir}/m2d
-Requires: @AX_PACKAGE_REQUIRES@
+Cflags: -I${includedir}
 Requires.private: @AX_PACKAGE_REQUIRES_PRIVATE@

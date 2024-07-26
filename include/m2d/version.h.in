@@ -1,0 +1,14 @@
+/*
+ * Copyright (C) 2024 Microchip Technology Inc.  All rights reserved.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+#ifndef M2D_VERSION_H
+#define M2D_VERSION_H
+
+/**
+ * M2D version string.
+ */
+#define M2D_VERSION "@PACKAGE_VERSION@"
+
+#endif

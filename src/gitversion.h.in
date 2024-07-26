@@ -1,0 +1,6 @@
+#ifndef M2D_GITVERSION_H
+#define M2D_GITVERSION_H
+
+#cmakedefine GIT_VERSION @GIT_VERSION@
+
+#endif /* M2D_GITVERSION_H */

@@ -1,61 +1,68 @@
 /*
- * Copyright (C) 2018 Microchip Technology Inc.  All rights reserved.
- * Joshua Henderson <joshua.henderson@microchip.com>
+ * Copyright (C) 2024 Microchip Technology Inc.  All rights reserved.
+ *
+ * SPDX-License-Identifier: Apache-2.0
  */
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
-
 #include "utils.h"
 #include <assert.h>
+#include <cairo.h>
 #include <stdio.h>
 #include <time.h>
 
-#ifdef HAVE_CAIRO
-#include <cairo.h>
-
-struct m2d_buf* load_png(const char* filename, void* handle)
+struct m2d_buffer* load_png(const char* filename)
 {
+	struct m2d_buffer* buf = NULL;
 	cairo_t* cr;
-	cairo_surface_t* surface;
-	cairo_surface_t* image;
-	int width;
-	int height;
-	struct m2d_buf* src;
-	cairo_format_t format = CAIRO_FORMAT_ARGB32;
+	cairo_surface_t* target;
+	cairo_surface_t* source;
+	size_t width;
+	size_t height;
+	size_t stride;
 
-	printf("loading image...\n");
-	image = cairo_image_surface_create_from_png(filename);
-	assert(image);
+	source = cairo_image_surface_create_from_png(filename);
+	if (!source)
+		goto end;
 
-	width = cairo_image_surface_get_width(image);
-	height = cairo_image_surface_get_height(image);
+	width = cairo_image_surface_get_width(source);
+	height = cairo_image_surface_get_height(source);
+	stride = cairo_image_surface_get_stride(source);
 
-	src = m2d_alloc(handle, width*height*4);
+	buf = m2d_alloc(width, height, M2D_PF_ARGB8888, stride);
+	if (!buf)
+		goto destroy_source;
 
-	printf("creating surface %d,%d ...\n", width, height);
+	target = cairo_image_surface_create_for_data(m2d_get_data(buf),
+						     CAIRO_FORMAT_ARGB32,
+						     width, height,
+						     stride);
+	if (!target)
+		goto free_buffer;
 
-	surface = cairo_image_surface_create_for_data(src->vaddr,
-						      format,
-						      width, height,
-						      cairo_format_stride_for_width(format, width));
-	assert(surface);
-
-	cr = cairo_create(surface);
-	assert(cr);
+	cr = cairo_create(target);
+	cairo_surface_destroy(target);
+	if (!cr)
+		goto free_buffer;
 
 	cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
-	cairo_set_source_surface(cr, image, 0, 0);
+	cairo_set_source_surface(cr, source, 0, 0);
 
 	cairo_paint(cr);
 
-	cairo_surface_destroy(image);
-	cairo_surface_destroy(surface);
+	cairo_surface_destroy(source);
 	cairo_destroy(cr);
 
-	return src;
+	return buf;
+
+free_buffer:
+	m2d_free(buf);
+	buf = NULL;
+
+destroy_source:
+	cairo_surface_destroy(source);
+
+end:
+	return buf;
 }
-#endif
 
 static void timespec_diff(struct timespec *start, struct timespec *stop,
 			  struct timespec *result)
