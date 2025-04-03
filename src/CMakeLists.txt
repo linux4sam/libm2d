@@ -3,7 +3,7 @@ add_library(m2d SHARED
     gfx2d.c
 )
 
-set_target_properties(m2d PROPERTIES VERSION 1.0.0 SOVERSION 1)
+set_target_properties(m2d PROPERTIES VERSION 2.0.0 SOVERSION 2)
 
 target_sources(m2d PUBLIC FILE_SET HEADERS
     BASE_DIRS ${CMAKE_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/include
