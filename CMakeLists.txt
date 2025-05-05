@@ -6,7 +6,7 @@ project(
     DESCRIPTION "A linux middleware graphic library for Microchip MPUs"
     LANGUAGES C
 )
-set(PROJECT_VERSION_RC 1)
+#set(PROJECT_VERSION_RC 1)
 if(DEFINED PROJECT_VERSION_RC)
     string(APPEND PROJECT_VERSION "-rc${PROJECT_VERSION_RC}")
 endif()
