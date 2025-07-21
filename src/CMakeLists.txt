@@ -10,6 +10,48 @@ if(GPU MATCHES "^microchip,sam.*-gfx2d$")
     set(NEED_LIBDRM ON)
 endif()
 
+string(COMPARE EQUAL ${GPU} "vivante,gc-etnaviv" IS_ETNAVIV)
+if(IS_ETNAVIV)
+    target_sources(m2d PRIVATE vivante_gc.c etnaviv.c)
+    target_include_directories(m2d PRIVATE ${CMAKE_SOURCE_DIR}/src/vivante_gc})
+
+    pkg_check_modules(LIBDRM_ETNAVIV REQUIRED libdrm_etnaviv>=${LIBDRM_MIN_VERSION})
+    set(AX_PACKAGE_REQUIRES_PRIVATE "${AX_PACKAGE_REQUIRES_PRIVATE} libdrm_etnaviv >= ${LIBDRM_MIN_VERSION}")
+
+    target_include_directories(m2d PRIVATE ${LIBDRM_ETNAVIV_INCLUDE_DIRS})
+    target_compile_options(m2d PRIVATE ${LIBDRM_ETNAVIV_CFLAGS_OTHER})
+    target_link_directories(m2d PRIVATE ${LIBDRM_ETNAVIV_LIBRARY_DIRS})
+    target_link_libraries(m2d PRIVATE ${LIBDRM_ETNAVIV_LIBRARIES})
+    target_link_options(m2d PRIVATE ${LIBDRM_ETNAVIV_LDFLAGS_OTHER})
+
+    if(ENABLE_VIVANTE_GC_DUMP_CMD_BUF)
+        target_compile_definitions(m2d PRIVATE VIVANTE_GC_DUMP_CMD_BUF=1)
+        target_link_options(m2d PRIVATE -Wl,--wrap=etna_cmd_stream_flush)
+    endif()
+
+    set(NEED_LIBDRM ON)
+endif()
+
+string(COMPARE EQUAL ${GPU} "vivante,gc-nano2d" IS_NANO2D)
+if(IS_NANO2D)
+    target_sources(m2d PRIVATE vivante_gc.c nano2d.c)
+    target_include_directories(m2d PRIVATE ${CMAKE_SOURCE_DIR}/src/vivante_gc})
+
+    set(NANO2D_MIN_VERSION 2.0.41)
+    pkg_check_modules(NANO2D REQUIRED nano2D>=${NANO2D_MIN_VERSION})
+    set(AX_PACKAGE_REQUIRES_PRIVATE "${AX_PACKAGE_REQUIRES_PRIVATE} nano2D >= ${NANO2D_MIN_VERSION}")
+
+    target_include_directories(m2d PRIVATE ${NANO2D_INCLUDE_DIRS})
+    target_compile_options(m2d PRIVATE ${NANO2D_CFLAGS_OTHER})
+    target_link_directories(m2d PRIVATE ${NANO2D_LIBRARY_DIRS})
+    target_link_libraries(m2d PRIVATE ${NANO2D_LIBRARIES})
+    target_link_options(m2d PRIVATE ${NANO2D_LDFLAGS_OTHER})
+
+    if(ENABLE_VIVANTE_GC_DUMP_CMD_BUF)
+        target_compile_definitions(m2d PRIVATE VIVANTE_GC_DUMP_CMD_BUF=1)
+    endif()
+endif()
+
 set_target_properties(m2d PROPERTIES VERSION 2.1.0 SOVERSION 2)
 
 target_sources(m2d PUBLIC FILE_SET HEADERS

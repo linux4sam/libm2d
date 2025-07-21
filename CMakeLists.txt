@@ -23,7 +23,7 @@ find_package(PkgConfig REQUIRED)
 
 set(PACKAGE_VERSION ${PROJECT_VERSION})
 
-set(SUPPORTED_GPUS "microchip,sam9x60-gfx2d" "microchip,sam9x7-gfx2d")
+set(SUPPORTED_GPUS "microchip,sam9x60-gfx2d" "microchip,sam9x7-gfx2d" "vivante,gc-nano2d" "vivante,gc-etnaviv")
 if(NOT DEFINED GPU)
     list(GET SUPPORTED_GPUS 0 GPU)
 else()
@@ -41,6 +41,8 @@ option(ENABLE_M2D_ASSERT "Enable m2d_assert() macro [default=OFF]" OFF)
 if(ENABLE_M2D_ASSERT)
     add_compile_definitions(M2D_ASSERT=1)
 endif()
+
+option(ENABLE_VIVANTE_GC_DUMP_CMD_BUF "Enable dumping of command buffers [default=OFF]" OFF)
 
 add_subdirectory(src)
 
