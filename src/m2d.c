@@ -300,6 +300,34 @@ const char* m2d_source_name(enum m2d_source_id id)
     return "unknown";
 }
 
+struct timespec* m2d_timespec_diff(const struct timespec* t1,
+                                   const struct timespec* t2,
+                                   struct timespec* t)
+{
+    struct timespec tmp;
+
+    if (t2->tv_sec > t1->tv_sec)
+        return NULL;
+
+    tmp.tv_sec = t1->tv_sec - t2->tv_sec;
+
+    if (t2->tv_nsec > t1->tv_nsec)
+    {
+        if (!tmp.tv_sec)
+            return NULL;
+
+        tmp.tv_sec -= 1;
+        tmp.tv_nsec = 1000000000 - t2->tv_nsec + t1->tv_nsec;
+    }
+    else
+        tmp.tv_nsec = t1->tv_nsec - t2->tv_nsec;
+
+    if (t)
+        *t = tmp;
+
+    return t;
+}
+
 bool m2d_intersect(const struct m2d_rectangle* a,
 		   const struct m2d_rectangle* b,
 		   struct m2d_rectangle* result)

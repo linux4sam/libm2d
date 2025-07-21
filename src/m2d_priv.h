@@ -129,6 +129,11 @@ struct m2d_device
 
 struct m2d_device* m2d_get_device();
 
+/* return t = t1 - t2 */
+struct timespec* m2d_timespec_diff(const struct timespec* t1,
+                                   const struct timespec* t2,
+                                   struct timespec* t);
+
 bool m2d_intersect(const struct m2d_rectangle* a,
                    const struct m2d_rectangle* b,
                    struct m2d_rectangle* result);
