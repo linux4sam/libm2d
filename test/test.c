@@ -136,10 +136,6 @@ static void draw_images(void)
 {
     struct m2d_buffer* bg;
     struct m2d_buffer* bg2;
-    struct m2d_buffer* on;
-    struct m2d_buffer* off;
-    struct m2d_buffer* up;
-    struct m2d_buffer* down;
     struct m2d_rectangle rect;
     char filename[256];
     int x, y;
@@ -155,26 +151,6 @@ static void draw_images(void)
     bg2 = load_png(filename);
     if (!bg2)
         goto free_bg;
-
-    snprintf(filename, sizeof(filename), "%s/on.png", TESTDATA);
-    on = load_png(filename);
-    if (!on)
-        goto free_bg2;
-
-    snprintf(filename, sizeof(filename), "%s/off.png", TESTDATA);
-    off = load_png(filename);
-    if (!off)
-        goto free_on;
-
-    snprintf(filename, sizeof(filename), "%s/up.png", TESTDATA);
-    up = load_png(filename);
-    if (!up)
-        goto free_off;
-
-    snprintf(filename, sizeof(filename), "%s/down.png", TESTDATA);
-    down = load_png(filename);
-    if (!down)
-        goto free_up;
 
     draw_background(bg);
 
@@ -193,6 +169,51 @@ static void draw_images(void)
             usleep(100000);
         }
     }
+
+    sleep(1);
+
+    m2d_free(bg2);
+free_bg:
+    m2d_free(bg);
+}
+
+static void blend_images(void)
+{
+    struct m2d_buffer* bg;
+    struct m2d_buffer* on;
+    struct m2d_buffer* off;
+    struct m2d_buffer* up;
+    struct m2d_buffer* down;
+    struct m2d_rectangle rect;
+    char filename[256];
+
+    snprintf(filename, sizeof(filename), "%s/background2_%ux%u.png",
+             TESTDATA, screen_width, screen_height);
+    bg = load_png(filename);
+    if (!bg)
+        return;
+
+    snprintf(filename, sizeof(filename), "%s/on.png", TESTDATA);
+    on = load_png(filename);
+    if (!on)
+        goto free_bg;
+
+    snprintf(filename, sizeof(filename), "%s/off.png", TESTDATA);
+    off = load_png(filename);
+    if (!off)
+        goto free_on;
+
+    snprintf(filename, sizeof(filename), "%s/up.png", TESTDATA);
+    up = load_png(filename);
+    if (!up)
+        goto free_off;
+
+    snprintf(filename, sizeof(filename), "%s/down.png", TESTDATA);
+    down = load_png(filename);
+    if (!down)
+        goto free_up;
+
+    draw_background(bg);
 
     sleep(3);
 
@@ -234,8 +255,6 @@ free_off:
     m2d_free(off);
 free_on:
     m2d_free(on);
-free_bg2:
-    m2d_free(bg2);
 free_bg:
     m2d_free(bg);
 }
@@ -297,6 +316,7 @@ int main(int argc, char* argv[])
 
     draw_rectangles();
     draw_images();
+    blend_images();
     sleep(9);
 
     ret = EXIT_SUCCESS;
