@@ -16,15 +16,18 @@
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 #endif
 
-static inline int min_int(int a, int b)
-{
-    return a < b ? a : b;
+#define DEFINE_MIN_MAX(type)                     \
+static inline type min_##type(type a, type b)    \
+{                                                \
+    return a < b ? a : b;                        \
+}                                                \
+                                                 \
+static inline type max_##type(type a, type b)    \
+{                                                \
+    return a > b ? a : b;                        \
 }
 
-static inline int max_int(int a, int b)
-{
-    return a > b ? a : b;
-}
+DEFINE_MIN_MAX(int)
 
 bool m2d_intersect(const struct m2d_rectangle* a,
                    const struct m2d_rectangle* b,
