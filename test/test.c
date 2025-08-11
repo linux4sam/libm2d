@@ -36,6 +36,10 @@ static size_t stride(enum m2d_pixel_format format, size_t width)
         bits_per_pixel = 16;
         break;
 
+    case M2D_PF_A8:
+        bits_per_pixel = 8;
+        break;
+
     default:
         bits_per_pixel = 0;
         break;
