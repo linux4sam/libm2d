@@ -642,11 +642,26 @@ static int gfx2d_submit_blend(struct drm_mchp_gfx2d_submit* args)
     return 0;
 }
 
+static const struct m2d_source* gfx2d_get_dst_or_target(struct m2d_source* tmp)
+{
+    const struct m2d_source* dst = &dev.state.sources[M2D_DST];
+
+    if (dst->enabled && dst->buf)
+        return dst;
+
+    tmp->buf = dev.state.target;
+    tmp->x = 0;
+    tmp->y = 0;
+    tmp->enabled = true;
+    return tmp;
+}
+
 static void gfx2d_blend(const struct m2d_rectangle* rects, size_t num_rects)
 {
     struct m2d_buffer* target = dev.state.target;
     const struct m2d_source* src = &dev.state.sources[M2D_SRC];
-    const struct m2d_source* dst = &dev.state.sources[M2D_DST];
+    struct m2d_source tmp;
+    const struct m2d_source* dst = gfx2d_get_dst_or_target(&tmp);
     struct drm_mchp_gfx2d_submit args;
 
     LIBM2D_DEBUG("reading %s surface pixels from buffer %u {origin: (%d,%d)}\n",
@@ -741,7 +756,8 @@ static void gfx2d_copy(const struct m2d_rectangle* rects, size_t num_rects)
     }
 }
 
-static void gfx2d_fill(const struct m2d_rectangle* rects, size_t num_rects)
+static int gfx2d_fill_target(const struct m2d_rectangle* rects, size_t num_rects,
+                             uint32_t target_handle)
 {
     struct drm_mchp_gfx2d_submit args;
 
@@ -751,15 +767,22 @@ static void gfx2d_fill(const struct m2d_rectangle* rects, size_t num_rects)
     args.rectangles = (uint64_t)(intptr_t)rects;
     args.num_rectangles = num_rects;
 
-    args.target_handle = dev.state.target->handle;
+    args.target_handle = target_handle;
 
     args.fill.color = dev.state.source_color;
 
     if (drmIoctl(dev.fd, DRM_IOCTL_MCHP_GFX2D_SUBMIT, &args) < 0)
     {
         LIBM2D_ERROR("can't submit FILL commands: %s\n", strerror(errno));
+        return -1;
     }
-    else
+
+    return 0;
+}
+
+static void gfx2d_fill(const struct m2d_rectangle* rects, size_t num_rects)
+{
+    if (!gfx2d_fill_target(rects, num_rects, dev.state.target->handle))
     {
         LIBM2D_DEBUG("filling %zu rectangle(s) with ARGB color %08X\n",
                      num_rects, dev.state.source_color);
@@ -767,10 +790,55 @@ static void gfx2d_fill(const struct m2d_rectangle* rects, size_t num_rects)
     }
 }
 
+static void gfx2d_blend_with_source_color(const struct m2d_rectangle* rects, size_t num_rects)
+{
+    struct m2d_buffer* target = dev.state.target;
+    struct m2d_source tmp;
+    const struct m2d_source* dst = gfx2d_get_dst_or_target(&tmp);
+    struct drm_mchp_gfx2d_submit args;
+    uint32_t handle;
+
+    LIBM2D_DEBUG("reading %s surface pixels from buffer %u {origin: (%d,%d)}\n",
+                 m2d_source_name(M2D_DST), dst->buf->id, dst->x, dst->y);
+
+    LIBM2D_TRACE("source color: %08X\n", dev.state.source_color);
+
+    handle = gfx2d_get_tmp_handle(target);
+    if (!handle || gfx2d_fill_target(rects, num_rects, handle))
+        return;
+
+    memset(&args, 0, sizeof(args));
+    args.operation = DRM_MCHP_GFX2D_OP_BLEND;
+
+    args.rectangles = (uint64_t)(intptr_t)rects;
+    args.num_rectangles = num_rects;
+
+    args.target_handle = target->handle;
+    args.sources[0].handle = dst->buf->handle;
+    args.sources[0].x = dst->x;
+    args.sources[0].y = dst->y;
+    args.sources[1].handle = handle;
+    args.sources[1].x = 0;
+    args.sources[1].y = 0;
+    args.blend.src_color = dev.state.blend_color;
+    args.blend.dst_color = dev.state.blend_color;
+    args.blend.function = dev.state.function;
+    args.blend.safactor = dev.state.safactor;
+    args.blend.dafactor = dev.state.dafactor;
+    args.blend.scfactor = dev.state.scfactor;
+    args.blend.dcfactor = dev.state.dcfactor;
+    if (!gfx2d_submit_blend(&args))
+    {
+        LIBM2D_DEBUG("blending %zu rectangle(s)\n", num_rects);
+        m2d_print_rectangles(rects, num_rects);
+    }
+}
+
 void m2d_draw_rectangles(const struct m2d_rectangle* rects, size_t num_rects)
 {
+    const struct m2d_source* src = &dev.state.sources[M2D_SRC];
     void (*func)(const struct m2d_rectangle*, size_t);
-    uint32_t i;
+    bool src_enabled = src->enabled && src->buf;
 
     if (dev.fd < 0)
     {
@@ -785,36 +853,11 @@ void m2d_draw_rectangles(const struct m2d_rectangle* rects, size_t num_rects)
     }
 
     if (dev.state.blend_enabled)
-    {
-        for (i = 0; i < 2; i++)
-        {
-            const struct m2d_source* source = &dev.state.sources[i];
-
-            if (!source->enabled || !source->buf)
-            {
-                LIBM2D_ERROR("GFX2D can't blend if %s source is disabled or not set\n",
-                             m2d_source_name((enum m2d_source_id)i));
-                return;
-            }
-        }
-
-        func = gfx2d_blend;
-    }
-    else if (dev.state.sources[0].enabled)
-    {
-        if (!dev.state.sources[0].buf)
-        {
-            LIBM2D_ERROR("GFX2D can't copy if %s source is not set\n",
-                         m2d_source_name(M2D_SRC));
-            return;
-        }
-
+        func = src_enabled ? gfx2d_blend : gfx2d_blend_with_source_color;
+    else if (src_enabled)
         func = gfx2d_copy;
-    }
     else
-    {
         func = gfx2d_fill;
-    }
 
     LIBM2D_DEBUG("writing target surface pixels into buffer %u\n",
                  dev.state.target->id);
