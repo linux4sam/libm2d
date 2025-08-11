@@ -94,6 +94,20 @@ static void draw_background(struct m2d_buffer* bg)
     m2d_draw_rectangles(&rect, 1);
 }
 
+static void fill(void)
+{
+    fill_background(0, 0, 0);
+    usleep(250000);
+    fill_background(255, 0, 0);
+    usleep(250000);
+    fill_background(0, 255, 0);
+    usleep(250000);
+    fill_background(0, 0, 255);
+    usleep(250000);
+    fill_background(255, 255, 255);
+    usleep(250000);
+}
+
 static void draw_rectangles(void)
 {
     struct m2d_rectangle rects[10];
@@ -270,6 +284,7 @@ free_bg:
 
 static const struct m2d_test tests[] =
 {
+    { "Fill", fill },
     { "DrawRectangles", draw_rectangles },
     { "DrawImages", draw_images },
     { "BlendImages", blend_images },
