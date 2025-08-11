@@ -6,7 +6,7 @@ if(GPU MATCHES "^microchip,sam.*-gfx2d$")
     target_sources(m2d PRIVATE gfx2d.c)
 endif()
 
-set_target_properties(m2d PROPERTIES VERSION 2.0.0 SOVERSION 2)
+set_target_properties(m2d PROPERTIES VERSION 2.1.0 SOVERSION 2)
 
 target_sources(m2d PUBLIC FILE_SET HEADERS
     BASE_DIRS ${CMAKE_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/include
