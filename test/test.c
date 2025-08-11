@@ -65,6 +65,8 @@ static void fill_background(uint8_t red, uint8_t green, uint8_t blue)
     rect.w = screen_width;
     rect.h = screen_height;
     m2d_draw_rectangles(&rect, 1);
+
+    m2d_source_color(255, 255, 255, 255);
 }
 
 static void draw_squares(void)
@@ -104,6 +106,8 @@ static void draw_squares(void)
         m2d_draw_rectangles(rects, 1);
         usleep(100000);
     }
+
+    m2d_source_color(255, 255, 255, 255);
 }
 
 static void draw_images(void)

@@ -49,6 +49,7 @@ struct m2d_buffer
     enum m2d_pixel_format format; /* describe the layout of the pixel components (red, green, blue, alpha) in memory. */
 
     uint32_t handle;
+    uint32_t tmp_handle;
 };
 
 struct m2d_source
@@ -86,6 +87,10 @@ struct gfx2d_device
 static struct gfx2d_device dev =
 {
     .fd = -1,
+    .state =
+    {
+        .source_color = 0xffffffffu,
+    },
 };
 
 static inline uint32_t gfx2d_color(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha)
@@ -409,6 +414,12 @@ void m2d_free(struct m2d_buffer* buf)
         munmap(buf->cpu_addr, size);
     }
 
+    if (buf->tmp_handle)
+    {
+        if (drmCloseBufferHandle(dev.fd, buf->tmp_handle))
+            LIBM2D_ERROR("could not free tmp buffer: %s\n", strerror(errno));
+    }
+
     if (buf->handle)
     {
         if (drmCloseBufferHandle(dev.fd, buf->handle))
@@ -583,8 +594,57 @@ void m2d_blend_factors(enum m2d_blend_factor src_rgb_factor,
     dev.state.dafactor = gfx2d_fix_afactor(to_gfx2d_blend_factor(dst_alpha_factor));
 }
 
+static int gfx2d_get_tmp_handle(struct m2d_buffer* buf)
+{
+    if (unlikely(!buf->tmp_handle))
+    {
+        size_t stride = buf->width * sizeof(uint32_t);
+        size_t size = buf->height * stride;
+        struct drm_mchp_gfx2d_alloc_buffer args;
+
+        memset(&args, 0, sizeof(args));
+        args.size = size;
+        args.width = (uint16_t)buf->width;
+        args.height = (uint16_t)buf->height;
+        args.stride = (uint16_t)stride;
+        args.format = DRM_MCHP_GFX2D_PF_ARGB32;
+        args.direction = DRM_MCHP_GFX2D_DIR_BIDIRECTIONAL;
+        if (drmIoctl(dev.fd, DRM_IOCTL_MCHP_GFX2D_ALLOC_BUFFER, &args) < 0)
+        {
+            LIBM2D_ERROR("could not create tmp bo for buffer %u: %s\n",
+                         buf->id, strerror(errno));
+        }
+        else
+        {
+            buf->tmp_handle = args.handle;
+        }
+    }
+
+    return buf->tmp_handle;
+}
+
+static int gfx2d_submit_blend(struct drm_mchp_gfx2d_submit* args)
+{
+    LIBM2D_TRACE("blend src color: %08X\n", args->blend.src_color);
+    LIBM2D_TRACE("blend dst color: %08X\n", args->blend.dst_color);
+    LIBM2D_TRACE("blend function: %s\n", gfx2d_blend_function_name(args->blend.function));
+    LIBM2D_TRACE("blend src color factor: %s\n", gfx2d_blend_factor_name(args->blend.scfactor));
+    LIBM2D_TRACE("blend dst color factor: %s\n", gfx2d_blend_factor_name(args->blend.dcfactor));
+    LIBM2D_TRACE("blend src alpha factor: %s\n", gfx2d_blend_factor_name(args->blend.safactor));
+    LIBM2D_TRACE("blend dst alpha factor: %s\n", gfx2d_blend_factor_name(args->blend.dafactor));
+
+    if (drmIoctl(dev.fd, DRM_IOCTL_MCHP_GFX2D_SUBMIT, args) < 0)
+    {
+        LIBM2D_ERROR("can't submit BLEND commands: %s\n", strerror(errno));
+        return -1;
+    }
+
+    return 0;
+}
+
 static void gfx2d_blend(const struct m2d_rectangle* rects, size_t num_rects)
 {
+    struct m2d_buffer* target = dev.state.target;
     const struct m2d_source* src = &dev.state.sources[M2D_SRC];
     const struct m2d_source* dst = &dev.state.sources[M2D_DST];
     struct drm_mchp_gfx2d_submit args;
@@ -594,43 +654,56 @@ static void gfx2d_blend(const struct m2d_rectangle* rects, size_t num_rects)
     LIBM2D_DEBUG("reading %s surface pixels from buffer %u {origin: (%d,%d)}\n",
                  m2d_source_name(M2D_DST), dst->buf->id, dst->x, dst->y);
 
-    LIBM2D_TRACE("blend function: %s\n", gfx2d_blend_function_name(dev.state.function));
-    LIBM2D_TRACE("blend src color factor: %s\n", gfx2d_blend_factor_name(dev.state.scfactor));
-    LIBM2D_TRACE("blend dst color factor: %s\n", gfx2d_blend_factor_name(dev.state.dcfactor));
-    LIBM2D_TRACE("blend src alpha factor: %s\n", gfx2d_blend_factor_name(dev.state.safactor));
-    LIBM2D_TRACE("blend dst alpha factor: %s\n", gfx2d_blend_factor_name(dev.state.dafactor));
-    LIBM2D_TRACE("blend src color: %08X\n", dev.state.source_color);
-    LIBM2D_TRACE("blend dst color: %08X\n", dev.state.blend_color);
-
     memset(&args, 0, sizeof(args));
     args.operation = DRM_MCHP_GFX2D_OP_BLEND;
 
     args.rectangles = (uint64_t)(intptr_t)rects;
     args.num_rectangles = num_rects;
 
+    args.sources[1].handle = src->buf->handle;
+    args.sources[1].x = src->x;
+    args.sources[1].y = src->y;
+
+    if (unlikely(dev.state.source_color != 0xffffffffu))
+    {
+        uint32_t handle = gfx2d_get_tmp_handle(target);
+
+        if (!handle)
+            return;
+
+        LIBM2D_TRACE("source color: %08X\n", dev.state.source_color);
+
+        /* Don't care about the DST (source 0) surface here. */
+        args.target_handle = handle;
+        args.sources[0].handle = src->buf->handle;
+        args.sources[0].x = src->x;
+        args.sources[0].y = src->y;
+        args.blend.src_color = dev.state.source_color;
+        args.blend.function = DRM_MCHP_GFX2D_BFUNC_ADD;
+        args.blend.safactor = DRM_MCHP_GFX2D_BFACTOR_CONSTANT_ALPHA;
+        args.blend.dafactor = DRM_MCHP_GFX2D_BFACTOR_ZERO;
+        args.blend.scfactor = DRM_MCHP_GFX2D_BFACTOR_CONSTANT_COLOR;
+        args.blend.dcfactor = DRM_MCHP_GFX2D_BFACTOR_ZERO;
+        if (gfx2d_submit_blend(&args))
+            return;
+
+        args.sources[1].handle = handle;
+        args.sources[1].x = 0;
+        args.sources[1].y = 0;
+    }
+
+    args.target_handle = target->handle;
+    args.sources[0].handle = dst->buf->handle;
+    args.sources[0].x = dst->x;
+    args.sources[0].y = dst->y;
+    args.blend.src_color = dev.state.blend_color;
+    args.blend.dst_color = dev.state.blend_color;
     args.blend.function = dev.state.function;
     args.blend.safactor = dev.state.safactor;
     args.blend.dafactor = dev.state.dafactor;
     args.blend.scfactor = dev.state.scfactor;
     args.blend.dcfactor = dev.state.dcfactor;
-    args.blend.dst_color = dev.state.blend_color;
-    args.blend.src_color = dev.state.source_color;
-
-    args.target_handle = dev.state.target->handle;
-
-    args.sources[0].handle = dst->buf->handle;
-    args.sources[0].x = dst->x;
-    args.sources[0].y = dst->y;
-
-    args.sources[1].handle = src->buf->handle;
-    args.sources[1].x = src->x;
-    args.sources[1].y = src->y;
-
-    if (drmIoctl(dev.fd, DRM_IOCTL_MCHP_GFX2D_SUBMIT, &args) < 0)
-    {
-        LIBM2D_ERROR("can't submit BLEND commands: %s\n", strerror(errno));
-    }
-    else
+    if (!gfx2d_submit_blend(&args))
     {
         LIBM2D_DEBUG("blending %zu rectangle(s)\n", num_rects);
         m2d_print_rectangles(rects, num_rects);
