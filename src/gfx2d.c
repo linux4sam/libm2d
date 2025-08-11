@@ -170,7 +170,7 @@ void m2d_cleanup()
         return;
     }
 
-    if (close(dev.fd))
+    if (drmClose(dev.fd))
         LIBM2D_ERROR("can't close DRM render node %s: %s\n", GFX2D_DEV_FILENAME, strerror(errno));
 
     dev.fd = -1;
