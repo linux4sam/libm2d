@@ -1,7 +1,10 @@
 add_library(m2d SHARED
     m2d.c
-    gfx2d.c
 )
+
+if(GPU MATCHES "^microchip,sam.*-gfx2d$")
+    target_sources(m2d PRIVATE gfx2d.c)
+endif()
 
 set_target_properties(m2d PROPERTIES VERSION 2.0.0 SOVERSION 2)
 

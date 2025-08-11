@@ -54,6 +54,54 @@ int m2d_init();
 void m2d_cleanup();
 
 /**
+ * struct m2d_capabilities - Describe the hardware capabilities and requirements
+ */
+struct m2d_capabilities
+{
+    /**
+     * @stride_alignment
+     *
+     * Define to the number of bytes required as the alignment for stride values:
+     * 1 means no requirement.
+     */
+    uint32_t stride_alignment;
+
+    /**
+     * @max_sources
+     *
+     * Define the maximum number of sources per rectangle supported by the GPU
+     * hardware.
+     */
+    uint32_t max_sources;
+
+    /**
+     * @has_dst
+     * Tell whether the GPU hardware makes the difference between the target
+     * and destination surfaces and manage the destination surface as a source.
+     */
+    bool dst_is_source;
+
+    /**
+     * @draw_lines
+     *
+     * Tell whether the GPU hardware can draw lines.
+     */
+    bool draw_lines;
+
+    /**
+     * @stretched_blit
+     *
+     * Tell whether the GPU hardware can stretch or shrink source surfaces.
+     */
+    bool stretched_blit;
+};
+
+/**
+ * Get the GPU capabilities.
+ */
+const struct m2d_capabilities* m2d_get_capabilities();
+
+/**
  * Allocate a new DRM GEM object to share a memory region between the userspace application and the GPU.
  *
  * @param[in] width The width in pixel of the memory region to allocate.

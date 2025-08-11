@@ -3,10 +3,223 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  */
+#include "m2d/version.h"
 #include "m2d_priv.h"
+#include "gitversion.h"
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <xf86drm.h>
+
+static struct m2d_device* dev;
+
+int m2d_init()
+{
+    drmVersionPtr version;
+
+    LIBM2D_INFO("Version %s\n", M2D_VERSION);
+    LIBM2D_INFO("Git Version %s\n", GIT_VERSION);
+
+    dev = m2d_get_device();
+
+    dev->next_id = 0;
+    dev->fd = drmOpenWithType(dev->name, NULL, DRM_NODE_RENDER);
+    if (dev->fd < 0)
+    {
+        LIBM2D_ERROR("can't open DRM render node %s: %s\n", dev->name, strerror(errno));
+        goto error;
+    }
+
+    (void)version;
+#if LIBM2D_ACTIVE_LEVEL <= LIBM2D_LEVEL_DEBUG
+    version = drmGetVersion(dev->fd);
+    if (version)
+    {
+        LIBM2D_DEBUG("DRM Version %d.%d.%d\n",
+                     version->version_major,
+                     version->version_minor,
+                     version->version_patchlevel);
+        LIBM2D_DEBUG("  Name: %s\n", version->name);
+        LIBM2D_DEBUG("  Date: %s\n", version->date);
+        LIBM2D_DEBUG("  Description: %s\n", version->desc);
+        drmFreeVersion(version);
+    }
+#endif
+
+    if (dev->funcs->init())
+        goto drm_close;
+
+    return 0;
+
+drm_close:
+    drmClose(dev->fd);
+    dev->fd = -1;
+
+error:
+    dev = NULL;
+    return -1;
+}
+
+void m2d_cleanup()
+{
+    LIBM2D_TRACE("cleaning libm2d up\n");
+
+    if (!dev || dev->fd < 0)
+    {
+        LIBM2D_ERROR("the DRM render node %s is not opened\n", dev->name);
+        return;
+    }
+
+    dev->funcs->cleanup();
+
+    if (drmClose(dev->fd))
+        LIBM2D_ERROR("can't close DRM render node %s: %s\n", dev->name, strerror(errno));
+
+    dev->fd = -1;
+    dev = NULL;
+}
+
+const struct m2d_capabilities* m2d_get_capabilities()
+{
+    return dev ? dev->caps : NULL;
+}
+
+struct m2d_buffer* m2d_alloc(size_t width, size_t height,
+                             enum m2d_pixel_format format, size_t stride)
+{
+    struct m2d_buffer* buf;
+
+    if (dev->fd < 0)
+        return NULL;
+
+    buf = dev->funcs->create(width, height, format, &stride);
+    if (!buf)
+    {
+        LIBM2D_ERROR("failed to create new buffer\n");
+        return NULL;
+    }
+
+    buf->id = dev->next_id++;
+    buf->width = width;
+    buf->height = height;
+    buf->format = format;
+    buf->stride = stride;
+
+    LIBM2D_DEBUG("allocated buffer %u (size: [%zux%zu], format: %s)\n",
+                 buf->id, width, height, m2d_format_name(format));
+
+    return buf;
+}
+
+struct m2d_buffer* m2d_import(const struct m2d_import_desc* desc)
+{
+    struct m2d_buffer* buf;
+
+    if (dev->fd < 0)
+        return NULL;
+
+    buf = dev->funcs->import(desc);
+    if (!buf)
+    {
+        LIBM2D_ERROR("failed to import buffer\n");
+        return NULL;
+    }
+
+    buf->id = dev->next_id++;
+    buf->width = desc->width;
+    buf->height = desc->height;
+    buf->format = desc->format;
+    buf->stride = desc->stride;
+    buf->cpu_addr = desc->cpu_addr;
+
+    LIBM2D_DEBUG("imported buffer %u from file descriptor %d (size: [%zux%zu], format: %s)\n",
+                 buf->id, desc->fd, desc->width, desc->height, m2d_format_name(desc->format));
+
+    return buf;
+}
+
+void m2d_free(struct m2d_buffer* buf)
+{
+    uint32_t id;
+
+    if (!buf)
+        return;
+
+    id = buf->id;
+    dev->funcs->free(buf);
+
+    (void)id;
+    LIBM2D_DEBUG("freed buffer %u\n", id);
+}
+
+int m2d_sync_for_cpu(struct m2d_buffer* buf, const struct timespec* timeout)
+{
+    if (dev->fd < 0)
+        return -1;
+
+    if (!buf)
+        return 0;
+
+    if (dev->funcs->sync_for_cpu(buf, timeout))
+        return -1;
+
+    LIBM2D_TRACE("synchronize buffer %u for CPU\n", buf->id);
+
+    return 0;
+}
+
+void m2d_sync_for_gpu(struct m2d_buffer* buf)
+{
+    if (dev->fd < 0)
+        return;
+
+    if (!buf)
+        return;
+
+    if (dev->funcs->sync_for_gpu(buf))
+        return;
+
+    LIBM2D_TRACE("synchronize buffer %u for GPU\n", buf->id);
+}
+
+int m2d_wait(const struct m2d_buffer* buf, const struct timespec* timeout)
+{
+    if (dev->fd < 0)
+        return -1;
+
+    if (!buf)
+        return 0;
+
+    if (dev->funcs->wait(buf, timeout))
+        return -1;
+
+    LIBM2D_TRACE("wait for buffer %u\n", buf->id);
+
+    return 0;
+}
+
+void* m2d_get_data(struct m2d_buffer* buf)
+{
+    return buf->cpu_addr;
+}
+
+size_t m2d_get_stride(const struct m2d_buffer* buf)
+{
+    return buf->stride;
+}
+
+void m2d_draw_rectangles(const struct m2d_rectangle* rects, size_t num_rects)
+{
+    if (dev->fd < 0)
+    {
+        LIBM2D_ERROR("the DRM render node %s is not opened\n", dev->name);
+        return;
+    }
+
+    dev->funcs->draw_rectangles(rects, num_rects);
+}
 
 const char* m2d_format_name(enum m2d_pixel_format format)
 {

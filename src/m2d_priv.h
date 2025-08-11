@@ -9,6 +9,8 @@
 #include "m2d/m2d.h"
 
 #include <stdarg.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <strings.h>
 
 #define unlikely(expr) (__builtin_expect (!!(expr), 0))
@@ -33,6 +35,64 @@ static inline type max_##type(type a, type b)    \
 }
 
 DEFINE_MIN_MAX(int)
+
+#ifndef container_of
+#define container_of(ptr, type, member) ((type *)((unsigned char *)(ptr) - offsetof(type, member)))
+#endif
+
+struct m2d_buffer
+{
+    uint32_t id;
+
+    /*
+     * A virtual address that can be used by the CPU from the userspace,
+     * by libcairo for instance, to access the memory behind the GEM DRM
+     * object. Likely returned by mmap().
+     */
+    void* cpu_addr;
+
+    size_t width; /* Width in pixels of the image/texture/frame buffer ... */
+    size_t height; /* Height in pixels of the image/texture/frame buffer ... */
+    size_t stride; /* Size in bytes between two consecutive pixel rows in the memory area. */
+    enum m2d_pixel_format format; /* describe the layout of the pixel components (red, green, blue, alpha) in memory. */
+};
+
+struct m2d_device_funcs
+{
+    int (*init)();
+    void (*cleanup)();
+
+    struct m2d_buffer* (*create)(size_t width, size_t height,
+                                 enum m2d_pixel_format format, size_t* stride);
+    struct m2d_buffer* (*import)(const struct m2d_import_desc* desc);
+    void (*free)(struct m2d_buffer* buf);
+    int (*sync_for_cpu)(struct m2d_buffer* buf, const struct timespec* timeout);
+    int (*sync_for_gpu)(struct m2d_buffer* buf);
+    int (*wait)(const struct m2d_buffer* buf, const struct timespec* timeout);
+    void (*draw_rectangles)(const struct m2d_rectangle* rects, size_t num_rects);
+    void (*draw_lines)(const struct m2d_line* lines, size_t num_lines);
+};
+
+struct m2d_device
+{
+    const char* name;
+    const struct m2d_capabilities* caps;
+    const struct m2d_device_funcs* funcs;
+
+    int fd;
+    uint32_t next_id;
+};
+
+#define INIT_DEVICE(member, nm, cp, fn)             \
+    .member =                                       \
+    {                                               \
+        .name = nm,                                 \
+        .caps = cp,                                 \
+        .funcs = fn,                                \
+        .fd = -1,                                   \
+    }
+
+struct m2d_device* m2d_get_device();
 
 bool m2d_intersect(const struct m2d_rectangle* a,
                    const struct m2d_rectangle* b,

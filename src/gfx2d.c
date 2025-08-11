@@ -5,22 +5,12 @@
  */
 #include "m2d/m2d.h"
 #include "m2d_priv.h"
-#include "gitversion.h"
 
 #include <drm/microchip_drm.h>
 #include <errno.h>
-#include <fcntl.h>
-#include <stdarg.h>
-#include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/ioctl.h>
 #include <sys/mman.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <time.h>
-#include <unistd.h>
 #include <xf86drm.h>
 
 #define GFX2D_TIMEOUT_SECS 1
@@ -29,32 +19,23 @@
 
 #define GFX2D_DIM_MASK  0x1fffu
 
-struct m2d_buffer
+struct gfx2d_buffer
 {
-    uint32_t id;
-
+    struct m2d_buffer base;
     bool imported;
     enum drm_mchp_gfx2d_direction direction;
-
-    /*
-     * A virtual address that can be used by the CPU from the userspace,
-     * by libcairo for instance, to access the memory behind the GEM DRM
-     * object. Likely returned by mmap().
-     */
-    void* cpu_addr;
-
-    size_t width; /* Width in pixels of the image/texture/frame buffer ... */
-    size_t height; /* Height in pixels of the image/texture/frame buffer ... */
-    size_t stride; /* Size in bytes between two consecutive pixel rows in the memory area. */
-    enum m2d_pixel_format format; /* describe the layout of the pixel components (red, green, blue, alpha) in memory. */
-
     uint32_t handle;
     uint32_t tmp_handle;
 };
 
-struct m2d_source
+static inline struct gfx2d_buffer* to_gfx2d_buffer(const struct m2d_buffer* buf)
 {
-    struct m2d_buffer* buf;
+    return buf ? container_of(buf, struct gfx2d_buffer, base) : NULL;
+}
+
+struct gfx2d_source
+{
+    struct gfx2d_buffer* buf;
     dim_t x;
     dim_t y;
     bool enabled;
@@ -62,10 +43,10 @@ struct m2d_source
 
 struct gfx2d_state
 {
-    struct m2d_buffer* target;
+    struct gfx2d_buffer* target;
 
     uint32_t source_color;
-    struct m2d_source sources[M2D_MAX_SOURCES];
+    struct gfx2d_source sources[M2D_MAX_SOURCES];
 
     bool blend_enabled;
     uint32_t blend_color;
@@ -78,20 +59,60 @@ struct gfx2d_state
 
 struct gfx2d_device
 {
-    int fd;
-    uint32_t next_id;
-
+    struct m2d_device base;
     struct gfx2d_state state;
+};
+
+static const struct m2d_capabilities gfx2d_caps =
+{
+    .stride_alignment = 1,
+    .max_sources = 1,
+    .dst_is_source = true,
+    .draw_lines = false,
+    .stretched_blit = false,
+};
+
+static int gfx2d_init(void);
+static void gfx2d_cleanup(void);
+static struct m2d_buffer* gfx2d_create(size_t width, size_t height,
+                                       enum m2d_pixel_format format,
+                                       size_t* stride);
+static struct m2d_buffer* gfx2d_import(const struct m2d_import_desc* desc);
+static void gfx2d_free(struct m2d_buffer* buf);
+static int gfx2d_sync_for_cpu(struct m2d_buffer* buf,
+                              const struct timespec* timeout);
+static int gfx2d_sync_for_gpu(struct m2d_buffer* buf);
+static int gfx2d_wait(const struct m2d_buffer* buf,
+                      const struct timespec* timeout);
+static void gfx2d_draw_rectangles(const struct m2d_rectangle* rects,
+                                  size_t num_rects);
+
+static const struct m2d_device_funcs gfx2d_device_funcs =
+{
+    .init = gfx2d_init,
+    .cleanup = gfx2d_cleanup,
+    .create = gfx2d_create,
+    .import = gfx2d_import,
+    .free = gfx2d_free,
+    .sync_for_cpu = gfx2d_sync_for_cpu,
+    .sync_for_gpu = gfx2d_sync_for_gpu,
+    .wait = gfx2d_wait,
+    .draw_rectangles = gfx2d_draw_rectangles,
 };
 
 static struct gfx2d_device dev =
 {
-    .fd = -1,
+    INIT_DEVICE(base, GFX2D_DEV_FILENAME, &gfx2d_caps, &gfx2d_device_funcs),
     .state =
     {
         .source_color = 0xffffffffu,
     },
 };
+
+struct m2d_device* m2d_get_device()
+{
+    return &dev.base;
+}
 
 static inline uint32_t gfx2d_color(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha)
 {
@@ -208,39 +229,6 @@ static inline const char* gfx2d_blend_factor_name(enum drm_mchp_gfx2d_blend_fact
     return m2d_blend_factor_name(from_gfx2d_blend_factor(factor));
 }
 
-int m2d_init()
-{
-    LIBM2D_INFO("Version %s\n", M2D_VERSION);
-    LIBM2D_INFO("Git Version %s\n", GIT_VERSION);
-
-    memset(&dev, 0, sizeof(dev));
-
-    dev.fd = drmOpenWithType(GFX2D_DEV_FILENAME, NULL, DRM_NODE_RENDER);
-    if (dev.fd < 0)
-    {
-        LIBM2D_ERROR("can't open DRM render node %s: %s\n", GFX2D_DEV_FILENAME, strerror(errno));
-        return -1;
-    }
-
-    return 0;
-}
-
-void m2d_cleanup()
-{
-    LIBM2D_TRACE("cleaning libm2d up\n");
-
-    if (dev.fd < 0)
-    {
-        LIBM2D_ERROR("the DRM render node %s is not opened\n", GFX2D_DEV_FILENAME);
-        return;
-    }
-
-    if (drmClose(dev.fd))
-        LIBM2D_ERROR("can't close DRM render node %s: %s\n", GFX2D_DEV_FILENAME, strerror(errno));
-
-    dev.fd = -1;
-}
-
 static enum drm_mchp_gfx2d_pixel_format
 to_gfx2d_format(enum m2d_pixel_format format)
 {
@@ -289,94 +277,93 @@ static bool gfx2d_surface_is_valid(size_t width, size_t height,
     return true;
 }
 
-struct m2d_buffer* m2d_alloc(size_t width, size_t height,
-                             enum m2d_pixel_format format, size_t stride)
+static int gfx2d_init()
+{
+    return 0;
+}
+
+static void gfx2d_cleanup()
+{
+}
+
+static struct m2d_buffer* gfx2d_create(size_t width, size_t height,
+                                       enum m2d_pixel_format format,
+                                       size_t* stride)
 {
     struct drm_mchp_gfx2d_alloc_buffer args;
+    struct gfx2d_buffer* priv_buf;
     struct m2d_buffer* buf;
     size_t size;
 
-    if (dev.fd < 0)
+    if (!gfx2d_surface_is_valid(width, height, format, *stride))
         return NULL;
 
-    if (!gfx2d_surface_is_valid(width, height, format, stride))
-        return NULL;
+    size = height * *stride;
 
-    size = height * stride;
-
-    buf = calloc(1, sizeof(*buf));
-    if (!buf)
+    priv_buf = calloc(1, sizeof(*priv_buf));
+    if (!priv_buf)
     {
         LIBM2D_ERROR("could not allocate memory for buffer: %s\n", strerror(errno));
-        goto fail;
+        goto out;
     }
+    buf = &priv_buf->base;
 
-    buf->id = dev.next_id++;
-    buf->direction = DRM_MCHP_GFX2D_DIR_BIDIRECTIONAL;
-    buf->width = width;
-    buf->height = height;
-    buf->format = format;
-    buf->stride = stride;
-    buf->cpu_addr = MAP_FAILED;
+    priv_buf->imported = false;
+    priv_buf->direction = DRM_MCHP_GFX2D_DIR_BIDIRECTIONAL;
 
     memset(&args, 0, sizeof(args));
     args.size = size;
     args.width = (uint16_t)width;
     args.height = (uint16_t)height;
-    args.stride = (uint16_t)stride;
+    args.stride = (uint16_t)*stride;
     args.format = to_gfx2d_format(format);
-    args.direction = buf->direction;
-    if (drmIoctl(dev.fd, DRM_IOCTL_MCHP_GFX2D_ALLOC_BUFFER, &args) < 0)
+    args.direction = priv_buf->direction;
+    if (drmIoctl(dev.base.fd, DRM_IOCTL_MCHP_GFX2D_ALLOC_BUFFER, &args) < 0)
     {
         LIBM2D_ERROR("could not create buffer: %s\n", strerror(errno));
-        goto fail;
+        goto out_free;
     }
 
-    buf->handle = args.handle;
+    priv_buf->handle = args.handle;
     buf->cpu_addr = mmap(0, size, PROT_READ | PROT_WRITE, MAP_SHARED,
-                         dev.fd, args.offset);
+                         dev.base.fd, args.offset);
     if (buf->cpu_addr == MAP_FAILED)
     {
         LIBM2D_ERROR("could not map dumb buffer: %s\n", strerror(errno));
-        goto fail;
+        goto out_drm_close;
     }
-
-    LIBM2D_DEBUG("allocated buffer %u (size: [%zux%zu], format: %s)\n",
-                 buf->id, width, height, m2d_format_name(format));
 
     return buf;
 
-fail:
-    m2d_free(buf);
+out_drm_close:
+    drmCloseBufferHandle(dev.base.fd, priv_buf->handle);
+
+out_free:
+    free(priv_buf);
+
+out:
     return NULL;
 }
 
-struct m2d_buffer* m2d_import(const struct m2d_import_desc* desc)
+static struct m2d_buffer* gfx2d_import(const struct m2d_import_desc* desc)
 {
     struct drm_mchp_gfx2d_import_buffer args;
+    struct gfx2d_buffer* priv_buf;
     struct m2d_buffer* buf;
-
-    if (dev.fd < 0)
-        return NULL;
 
     if (!gfx2d_surface_is_valid(desc->width, desc->height, desc->format, desc->stride))
         return NULL;
 
-    buf = calloc(1, sizeof(*buf));
-    if (!buf)
+    priv_buf = calloc(1, sizeof(*priv_buf));
+    if (!priv_buf)
     {
         LIBM2D_ERROR("could not allocate memory for imported dumb buffer: %s\n", strerror(errno));
-        goto fail;
+        return NULL;
     }
+    buf = &priv_buf->base;
 
-    buf->id = dev.next_id++;
-    buf->imported = true;
-    buf->direction = DRM_MCHP_GFX2D_DIR_NONE;
-    buf->width = desc->width;
-    buf->height = desc->height;
-    buf->format = desc->format;
-    buf->stride = desc->stride;
-    buf->cpu_addr = desc->cpu_addr;
+    priv_buf->imported = true;
+    priv_buf->direction = DRM_MCHP_GFX2D_DIR_NONE;
 
     memset(&args, 0, sizeof(args));
     args.fd = desc->fd;
@@ -384,65 +371,52 @@ struct m2d_buffer* m2d_import(const struct m2d_import_desc* desc)
     args.height = (uint16_t)desc->height;
     args.stride = (uint16_t)desc->stride;
     args.format = to_gfx2d_format(desc->format);
-    if (drmIoctl(dev.fd, DRM_IOCTL_MCHP_GFX2D_IMPORT_BUFFER, &args) < 0)
+    if (drmIoctl(dev.base.fd, DRM_IOCTL_MCHP_GFX2D_IMPORT_BUFFER, &args) < 0)
     {
         LIBM2D_ERROR("could not get an handle from a DRM PRIME file descriptor: %s\n", strerror(errno));
-        goto fail;
+        free(priv_buf);
+        return NULL;
     }
 
-    buf->handle = args.handle;
-
-    LIBM2D_DEBUG("imported buffer %u from file descriptor %d (size: [%zux%zu], format: %s)\n",
-                 buf->id, desc->fd, desc->width, desc->height, m2d_format_name(desc->format));
+    priv_buf->handle = args.handle;
 
     return buf;
-
-fail:
-    m2d_free(buf);
-    return NULL;
 }
 
-void m2d_free(struct m2d_buffer* buf)
+static void gfx2d_free(struct m2d_buffer* buf)
 {
-    if (!buf)
-        return;
+    struct gfx2d_buffer* priv_buf = to_gfx2d_buffer(buf);
 
-    if (!buf->imported && buf->cpu_addr != MAP_FAILED)
+    if (!priv_buf->imported && buf->cpu_addr != MAP_FAILED)
     {
         size_t size = buf->height * buf->stride;
 
         munmap(buf->cpu_addr, size);
     }
 
-    if (buf->tmp_handle)
+    if (priv_buf->tmp_handle)
     {
-        if (drmCloseBufferHandle(dev.fd, buf->tmp_handle))
+        if (drmCloseBufferHandle(dev.base.fd, priv_buf->tmp_handle))
             LIBM2D_ERROR("could not free tmp buffer: %s\n", strerror(errno));
     }
 
-    if (buf->handle)
+    if (priv_buf->handle)
     {
-        if (drmCloseBufferHandle(dev.fd, buf->handle))
+        if (drmCloseBufferHandle(dev.base.fd, priv_buf->handle))
             LIBM2D_ERROR("could not free buffer: %s\n", strerror(errno));
     }
 
-    LIBM2D_DEBUG("freed buffer %u\n", buf->id);
-
-    free(buf);
+    free(priv_buf);
 }
 
-int m2d_sync_for_cpu(struct m2d_buffer* buf, const struct timespec* timeout)
+static int gfx2d_sync_for_cpu(struct m2d_buffer* buf,
+                              const struct timespec* timeout)
 {
+    struct gfx2d_buffer* priv_buf = to_gfx2d_buffer(buf);
     struct drm_mchp_gfx2d_sync_for_cpu args;
 
-    if (dev.fd <0)
-        return -1;
-
-    if (!buf)
-        return 0;
-
     memset(&args, 0, sizeof(args));
-    args.handle = buf->handle;
+    args.handle = priv_buf->handle;
     if (timeout)
     {
         args.timeout.tv_sec = timeout->tv_sec;
@@ -453,54 +427,42 @@ int m2d_sync_for_cpu(struct m2d_buffer* buf, const struct timespec* timeout)
         args.flags = DRM_MCHP_GFX2D_WAIT_NONBLOCK;
     }
 
-    if (drmIoctl(dev.fd, DRM_IOCTL_MCHP_GFX2D_SYNC_FOR_CPU, &args) < 0)
+    if (drmIoctl(dev.base.fd, DRM_IOCTL_MCHP_GFX2D_SYNC_FOR_CPU, &args) < 0)
     {
         LIBM2D_ERROR("failed to synchronize buffer %u for CPU: %s\n", buf->id, strerror(errno));
         return -1;
     }
 
-    LIBM2D_TRACE("synchronize buffer %u for CPU\n", buf->id);
     return 0;
 }
 
-void m2d_sync_for_gpu(struct m2d_buffer* buf)
+static int gfx2d_sync_for_gpu(struct m2d_buffer* buf)
 {
+    struct gfx2d_buffer* priv_buf = to_gfx2d_buffer(buf);
     struct drm_mchp_gfx2d_sync_for_gpu args;
 
-    if (!buf || buf->imported || buf->direction == DRM_MCHP_GFX2D_DIR_NONE)
-        return;
-
-    memset(&args, 0, sizeof(args));
-    args.handle = buf->handle;
-
-    if (drmIoctl(dev.fd, DRM_IOCTL_MCHP_GFX2D_SYNC_FOR_GPU, &args) < 0)
-        LIBM2D_ERROR("failed to synchronize buffer %u for GPU: %s\n", buf->id, strerror(errno));
-    else
-        LIBM2D_TRACE("synchronize buffer %u for GPU\n", buf->id);
-}
-
-void* m2d_get_data(struct m2d_buffer* buf)
-{
-    return buf->cpu_addr;
-}
-
-size_t m2d_get_stride(const struct m2d_buffer* buf)
-{
-    return buf->stride;
-}
-
-int m2d_wait(const struct m2d_buffer* buf, const struct timespec* timeout)
-{
-    struct drm_mchp_gfx2d_wait args;
-
-    if (dev.fd < 0)
-        return -1;
-
-    if (!buf)
+    if (priv_buf->imported || priv_buf->direction == DRM_MCHP_GFX2D_DIR_NONE)
         return 0;
 
     memset(&args, 0, sizeof(args));
-    args.handle = buf->handle;
+    args.handle = priv_buf->handle;
+
+    if (drmIoctl(dev.base.fd, DRM_IOCTL_MCHP_GFX2D_SYNC_FOR_GPU, &args) < 0)
+    {
+        LIBM2D_ERROR("failed to synchronize buffer %u for GPU: %s\n", buf->id, strerror(errno));
+        return -1;
+    }
+
+    return 0;
+}
+
+static int gfx2d_wait(const struct m2d_buffer* buf, const struct timespec* timeout)
+{
+    const struct gfx2d_buffer* priv_buf = to_gfx2d_buffer(buf);
+    struct drm_mchp_gfx2d_wait args;
+
+    memset(&args, 0, sizeof(args));
+    args.handle = priv_buf->handle;
     if (timeout)
     {
         args.timeout.tv_sec = timeout->tv_sec;
@@ -511,19 +473,18 @@ int m2d_wait(const struct m2d_buffer* buf, const struct timespec* timeout)
         args.flags = DRM_MCHP_GFX2D_WAIT_NONBLOCK;
     }
 
-    if (drmIoctl(dev.fd, DRM_IOCTL_MCHP_GFX2D_WAIT, &args) < 0)
+    if (drmIoctl(dev.base.fd, DRM_IOCTL_MCHP_GFX2D_WAIT, &args) < 0)
     {
         LIBM2D_ERROR("failed to wait for buffer %u: %s\n", buf->id, strerror(errno));
         return -1;
     }
 
-    LIBM2D_TRACE("wait for buffer %u\n", buf->id);
     return 0;
 }
 
 void m2d_set_target(struct m2d_buffer* buf)
 {
-    dev.state.target = buf;
+    dev.state.target = to_gfx2d_buffer(buf);
 }
 
 void m2d_set_source(enum m2d_source_id id, struct m2d_buffer* buf, dim_t x, dim_t y)
@@ -531,8 +492,8 @@ void m2d_set_source(enum m2d_source_id id, struct m2d_buffer* buf, dim_t x, dim_
     if (id >= M2D_MAX_SOURCES)
         return;
 
-    struct m2d_source* source = &dev.state.sources[id];
-    source->buf = buf;
+    struct gfx2d_source* source = &dev.state.sources[id];
+    source->buf = to_gfx2d_buffer(buf);
     source->x = x;
     source->y = y;
 }
@@ -594,33 +555,33 @@ void m2d_blend_factors(enum m2d_blend_factor src_rgb_factor,
     dev.state.dafactor = gfx2d_fix_afactor(to_gfx2d_blend_factor(dst_alpha_factor));
 }
 
-static int gfx2d_get_tmp_handle(struct m2d_buffer* buf)
+static int gfx2d_get_tmp_handle(struct gfx2d_buffer* priv_buf)
 {
-    if (unlikely(!buf->tmp_handle))
+    if (unlikely(!priv_buf->tmp_handle))
     {
-        size_t stride = buf->width * sizeof(uint32_t);
-        size_t size = buf->height * stride;
+        size_t stride = priv_buf->base.width * sizeof(uint32_t);
+        size_t size = priv_buf->base.height * stride;
         struct drm_mchp_gfx2d_alloc_buffer args;
 
         memset(&args, 0, sizeof(args));
         args.size = size;
-        args.width = (uint16_t)buf->width;
-        args.height = (uint16_t)buf->height;
+        args.width = (uint16_t)priv_buf->base.width;
+        args.height = (uint16_t)priv_buf->base.height;
         args.stride = (uint16_t)stride;
         args.format = DRM_MCHP_GFX2D_PF_ARGB32;
         args.direction = DRM_MCHP_GFX2D_DIR_BIDIRECTIONAL;
-        if (drmIoctl(dev.fd, DRM_IOCTL_MCHP_GFX2D_ALLOC_BUFFER, &args) < 0)
+        if (drmIoctl(dev.base.fd, DRM_IOCTL_MCHP_GFX2D_ALLOC_BUFFER, &args) < 0)
         {
             LIBM2D_ERROR("could not create tmp bo for buffer %u: %s\n",
-                         buf->id, strerror(errno));
+                         priv_buf->base.id, strerror(errno));
         }
         else
         {
-            buf->tmp_handle = args.handle;
+            priv_buf->tmp_handle = args.handle;
         }
     }
 
-    return buf->tmp_handle;
+    return priv_buf->tmp_handle;
 }
 
 static int gfx2d_submit_blend(struct drm_mchp_gfx2d_submit* args)
@@ -633,7 +594,7 @@ static int gfx2d_submit_blend(struct drm_mchp_gfx2d_submit* args)
     LIBM2D_TRACE("blend src alpha factor: %s\n", gfx2d_blend_factor_name(args->blend.safactor));
     LIBM2D_TRACE("blend dst alpha factor: %s\n", gfx2d_blend_factor_name(args->blend.dafactor));
 
-    if (drmIoctl(dev.fd, DRM_IOCTL_MCHP_GFX2D_SUBMIT, args) < 0)
+    if (drmIoctl(dev.base.fd, DRM_IOCTL_MCHP_GFX2D_SUBMIT, args) < 0)
     {
         LIBM2D_ERROR("can't submit BLEND commands: %s\n", strerror(errno));
         return -1;
@@ -642,9 +603,9 @@ static int gfx2d_submit_blend(struct drm_mchp_gfx2d_submit* args)
     return 0;
 }
 
-static const struct m2d_source* gfx2d_get_dst_or_target(struct m2d_source* tmp)
+static const struct gfx2d_source* gfx2d_get_dst_or_target(struct gfx2d_source* tmp)
 {
-    const struct m2d_source* dst = &dev.state.sources[M2D_DST];
+    const struct gfx2d_source* dst = &dev.state.sources[M2D_DST];
 
     if (dst->enabled && dst->buf)
         return dst;
@@ -658,16 +619,16 @@ static const struct m2d_source* gfx2d_get_dst_or_target(struct m2d_source* tmp)
 
 static void gfx2d_blend(const struct m2d_rectangle* rects, size_t num_rects)
 {
-    struct m2d_buffer* target = dev.state.target;
-    const struct m2d_source* src = &dev.state.sources[M2D_SRC];
-    struct m2d_source tmp;
-    const struct m2d_source* dst = gfx2d_get_dst_or_target(&tmp);
+    struct gfx2d_buffer* target = dev.state.target;
+    const struct gfx2d_source* src = &dev.state.sources[M2D_SRC];
+    struct gfx2d_source tmp;
+    const struct gfx2d_source* dst = gfx2d_get_dst_or_target(&tmp);
     struct drm_mchp_gfx2d_submit args;
 
     LIBM2D_DEBUG("reading %s surface pixels from buffer %u {origin: (%d,%d)}\n",
-                 m2d_source_name(M2D_SRC), src->buf->id, src->x, src->y);
+                 m2d_source_name(M2D_SRC), src->buf->base.id, src->x, src->y);
     LIBM2D_DEBUG("reading %s surface pixels from buffer %u {origin: (%d,%d)}\n",
-                 m2d_source_name(M2D_DST), dst->buf->id, dst->x, dst->y);
+                 m2d_source_name(M2D_DST), dst->buf->base.id, dst->x, dst->y);
 
     memset(&args, 0, sizeof(args));
     args.operation = DRM_MCHP_GFX2D_OP_BLEND;
@@ -727,11 +688,11 @@ static void gfx2d_blend(const struct m2d_rectangle* rects, size_t num_rects)
 
 static void gfx2d_copy(const struct m2d_rectangle* rects, size_t num_rects)
 {
-    const struct m2d_source* src = &dev.state.sources[M2D_SRC];
+    const struct gfx2d_source* src = &dev.state.sources[M2D_SRC];
     struct drm_mchp_gfx2d_submit args;
 
     LIBM2D_DEBUG("reading %s surface pixels from buffer %u {origin: (%d,%d)}\n",
-                 m2d_source_name(M2D_SRC), src->buf->id, src->x, src->y);
+                 m2d_source_name(M2D_SRC), src->buf->base.id, src->x, src->y);
 
     memset(&args, 0, sizeof(args));
     args.operation = DRM_MCHP_GFX2D_OP_COPY;
@@ -745,7 +706,7 @@ static void gfx2d_copy(const struct m2d_rectangle* rects, size_t num_rects)
     args.sources[0].x = src->x;
     args.sources[0].y = src->y;
 
-    if (drmIoctl(dev.fd, DRM_IOCTL_MCHP_GFX2D_SUBMIT, &args) < 0)
+    if (drmIoctl(dev.base.fd, DRM_IOCTL_MCHP_GFX2D_SUBMIT, &args) < 0)
     {
         LIBM2D_ERROR("can't submit COPY commands: %s\n", strerror(errno));
     }
@@ -771,7 +732,7 @@ static int gfx2d_fill_target(const struct m2d_rectangle* rects, size_t num_rects
 
     args.fill.color = dev.state.source_color;
 
-    if (drmIoctl(dev.fd, DRM_IOCTL_MCHP_GFX2D_SUBMIT, &args) < 0)
+    if (drmIoctl(dev.base.fd, DRM_IOCTL_MCHP_GFX2D_SUBMIT, &args) < 0)
     {
         LIBM2D_ERROR("can't submit FILL commands: %s\n", strerror(errno));
         return -1;
@@ -792,14 +753,14 @@ static void gfx2d_fill(const struct m2d_rectangle* rects, size_t num_rects)
 
 static void gfx2d_blend_with_source_color(const struct m2d_rectangle* rects, size_t num_rects)
 {
-    struct m2d_buffer* target = dev.state.target;
-    struct m2d_source tmp;
-    const struct m2d_source* dst = gfx2d_get_dst_or_target(&tmp);
+    struct gfx2d_buffer* target = dev.state.target;
+    struct gfx2d_source tmp;
+    const struct gfx2d_source* dst = gfx2d_get_dst_or_target(&tmp);
     struct drm_mchp_gfx2d_submit args;
     uint32_t handle;
 
     LIBM2D_DEBUG("reading %s surface pixels from buffer %u {origin: (%d,%d)}\n",
-                 m2d_source_name(M2D_DST), dst->buf->id, dst->x, dst->y);
+                 m2d_source_name(M2D_DST), dst->buf->base.id, dst->x, dst->y);
 
     LIBM2D_TRACE("source color: %08X\n", dev.state.source_color);
 
@@ -834,17 +795,12 @@ static void gfx2d_blend_with_source_color(const struct m2d_rectangle* rects, siz
     }
 }
 
-void m2d_draw_rectangles(const struct m2d_rectangle* rects, size_t num_rects)
+static void gfx2d_draw_rectangles(const struct m2d_rectangle* rects,
+                                  size_t num_rects)
 {
-    const struct m2d_source* src = &dev.state.sources[M2D_SRC];
+    const struct gfx2d_source* src = &dev.state.sources[M2D_SRC];
     void (*func)(const struct m2d_rectangle*, size_t);
     bool src_enabled = src->enabled && src->buf;
-
-    if (dev.fd < 0)
-    {
-        LIBM2D_ERROR("the DRM render node %s is not opened\n", GFX2D_DEV_FILENAME);
-        return;
-    }
 
     if (!dev.state.target)
     {
@@ -860,17 +816,11 @@ void m2d_draw_rectangles(const struct m2d_rectangle* rects, size_t num_rects)
         func = gfx2d_fill;
 
     LIBM2D_DEBUG("writing target surface pixels into buffer %u\n",
-                 dev.state.target->id);
+                 dev.state.target->base.id);
     func(rects, num_rects);
 }
 
 void m2d_line_width(dim_t width)
 {
     (void)width;
-}
-
-void m2d_draw_lines(const struct m2d_line* lines, size_t num_lines)
-{
-    (void)lines;
-    (void)num_lines;
 }

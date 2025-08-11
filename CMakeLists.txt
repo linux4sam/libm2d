@@ -26,6 +26,18 @@ set(AX_PACKAGE_REQUIRES_PRIVATE "libdrm >= 2.4.0")
 
 set(PACKAGE_VERSION ${PROJECT_VERSION})
 
+set(SUPPORTED_GPUS "microchip,sam9x60-gfx2d" "microchip,sam9x7-gfx2d")
+if(NOT DEFINED GPU)
+    list(GET SUPPORTED_GPUS 0 GPU)
+else()
+    string(TOLOWER "${GPU}" GPU)
+endif()
+if(GPU IN_LIST SUPPORTED_GPUS)
+    message(CHECK_START "Selecting GPU: \"${GPU}\"")
+else()
+    message(FATAL_ERROR "unsupported GPU: \"${GPU}\" (supported GPUs: ${SUPPORTED_GPUS})")
+endif()
+
 add_subdirectory(src)
 
 option(ENABLE_TESTS "build tests [default=OFF]" OFF)
