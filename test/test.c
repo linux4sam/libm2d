@@ -57,6 +57,7 @@ static void fill_background(uint8_t red, uint8_t green, uint8_t blue)
     struct m2d_rectangle rect;
 
     m2d_source_enable(M2D_SRC, false);
+    m2d_source_enable(M2D_DST, false);
     m2d_blend_enable(false);
 
     m2d_source_color(red, green, blue, 255);
@@ -78,6 +79,7 @@ static void draw_squares(void)
     memset(rects, 0, sizeof(rects));
 
     m2d_source_enable(M2D_SRC, false);
+    m2d_source_enable(M2D_DST, false);
     m2d_blend_enable(false);
 
     m2d_source_color(rand() & 255, rand() & 255, rand() & 255, 255);
@@ -155,6 +157,7 @@ static void draw_images(void)
         goto free_up;
 
     m2d_source_enable(M2D_SRC, true);
+    m2d_source_enable(M2D_DST, false);
     m2d_blend_enable(false);
 
     m2d_set_source(M2D_SRC, bg, 0, 0);
