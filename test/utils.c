@@ -20,7 +20,7 @@ struct m2d_buffer* load_png(const char* filename)
 	size_t stride;
 
 	source = cairo_image_surface_create_from_png(filename);
-	if (!source)
+	if (cairo_surface_status(source) != CAIRO_STATUS_SUCCESS)
 		goto end;
 
 	width = cairo_image_surface_get_width(source);
@@ -35,7 +35,7 @@ struct m2d_buffer* load_png(const char* filename)
 						     CAIRO_FORMAT_ARGB32,
 						     width, height,
 						     stride);
-	if (!target)
+	if (cairo_surface_status(target) != CAIRO_STATUS_SUCCESS)
 		goto free_buffer;
 
 	cr = cairo_create(target);
