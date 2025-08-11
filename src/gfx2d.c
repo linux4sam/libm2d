@@ -113,6 +113,31 @@ to_gfx2d_blend_function(enum m2d_blend_function func)
     return DRM_MCHP_GFX2D_BFUNC_ADD;
 }
 
+static enum m2d_blend_function
+from_gfx2d_blend_function(enum drm_mchp_gfx2d_blend_function func)
+{
+#define BFUNC_MAP2(name) case DRM_MCHP_GFX2D_BFUNC_##name: return M2D_FUNC_##name
+
+    switch (func)
+    {
+        BFUNC_MAP2(ADD);
+        BFUNC_MAP2(SUBTRACT);
+        BFUNC_MAP2(REVERSE);
+        BFUNC_MAP2(MIN);
+        BFUNC_MAP2(MAX);
+    default:
+        LIBM2D_ERROR("invalid blend function\n");
+        break;
+    }
+
+    return M2D_FUNC_ADD;
+}
+
+static inline const char* gfx2d_blend_function_name(enum drm_mchp_gfx2d_blend_function func)
+{
+    return m2d_blend_function_name(from_gfx2d_blend_function(func));
+}
+
 static enum drm_mchp_gfx2d_blend_factor
 to_gfx2d_blend_factor(enum m2d_blend_factor factor)
 {
@@ -141,6 +166,41 @@ to_gfx2d_blend_factor(enum m2d_blend_factor factor)
     }
 
     return DRM_MCHP_GFX2D_BFACTOR_ZERO;
+}
+
+static enum m2d_blend_factor
+from_gfx2d_blend_factor(enum drm_mchp_gfx2d_blend_factor factor)
+{
+#define BFACTOR_MAP2(name) case DRM_MCHP_GFX2D_BFACTOR_##name: return M2D_BLEND_##name
+
+    switch (factor)
+    {
+        BFACTOR_MAP2(ZERO);
+        BFACTOR_MAP2(ONE);
+        BFACTOR_MAP2(SRC_COLOR);
+        BFACTOR_MAP2(ONE_MINUS_SRC_COLOR);
+        BFACTOR_MAP2(DST_COLOR);
+        BFACTOR_MAP2(ONE_MINUS_DST_COLOR);
+        BFACTOR_MAP2(SRC_ALPHA);
+        BFACTOR_MAP2(ONE_MINUS_SRC_ALPHA);
+        BFACTOR_MAP2(DST_ALPHA);
+        BFACTOR_MAP2(ONE_MINUS_DST_ALPHA);
+        BFACTOR_MAP2(CONSTANT_COLOR);
+        BFACTOR_MAP2(ONE_MINUS_CONSTANT_COLOR);
+        BFACTOR_MAP2(CONSTANT_ALPHA);
+        BFACTOR_MAP2(ONE_MINUS_CONSTANT_ALPHA);
+        BFACTOR_MAP2(SRC_ALPHA_SATURATE);
+    default:
+        LIBM2D_ERROR("invalid blend factor\n");
+        break;
+    }
+
+    return M2D_BLEND_ZERO;
+}
+
+static inline const char* gfx2d_blend_factor_name(enum drm_mchp_gfx2d_blend_factor factor)
+{
+    return m2d_blend_factor_name(from_gfx2d_blend_factor(factor));
 }
 
 int m2d_init()
@@ -514,11 +574,11 @@ static void gfx2d_blend(const struct m2d_rectangle* rects, size_t num_rects)
     LIBM2D_DEBUG("reading %s surface pixels from buffer %u {origin: (%d,%d)}\n",
                  m2d_source_name(M2D_DST), dst->buf->id, dst->x, dst->y);
 
-    LIBM2D_TRACE("blend function: %s\n", m2d_blend_function_name(dev.state.function));
-    LIBM2D_TRACE("blend src color factor: %s\n", m2d_blend_factor_name(dev.state.scfactor));
-    LIBM2D_TRACE("blend dst color factor: %s\n", m2d_blend_factor_name(dev.state.dcfactor));
-    LIBM2D_TRACE("blend src alpha factor: %s\n", m2d_blend_factor_name(dev.state.safactor));
-    LIBM2D_TRACE("blend dst alpha factor: %s\n", m2d_blend_factor_name(dev.state.dafactor));
+    LIBM2D_TRACE("blend function: %s\n", gfx2d_blend_function_name(dev.state.function));
+    LIBM2D_TRACE("blend src color factor: %s\n", gfx2d_blend_factor_name(dev.state.scfactor));
+    LIBM2D_TRACE("blend dst color factor: %s\n", gfx2d_blend_factor_name(dev.state.dcfactor));
+    LIBM2D_TRACE("blend src alpha factor: %s\n", gfx2d_blend_factor_name(dev.state.safactor));
+    LIBM2D_TRACE("blend dst alpha factor: %s\n", gfx2d_blend_factor_name(dev.state.dafactor));
     LIBM2D_TRACE("blend src color: %08X\n", dev.state.source_color);
     LIBM2D_TRACE("blend dst color: %08X\n", dev.state.blend_color);
 
