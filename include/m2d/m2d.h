@@ -59,8 +59,11 @@ void m2d_cleanup();
  * @param[in] width The width in pixel of the memory region to allocate.
  * @param[in] height The height in pixel of the memory region to allocate.
  * @param[in] pixel_format The pixel format of the memory region to allocate.
- * @param[in] stride The size in bytes between two consecutive rows in the memory region.
+ * @param[in] stride The requested size in bytes between two consecutive rows in the memory region.
  * @return a pointer to a 'struct m2d_buffer' that represents the allocated memory region.
+ *
+ * @note The actual stride value of the returned 'struct m2d_buffer*' may be
+ *       different from @stride, hence should be retreived with @m2d_get_stride().
  */
 struct m2d_buffer* m2d_alloc(size_t width, size_t height, enum m2d_pixel_format format, size_t stride);
 
@@ -126,6 +129,14 @@ void m2d_sync_for_gpu(struct m2d_buffer* buf);
  * @return the virtual address for @buf and its associated DRM GEM object.
  */
 void* m2d_get_data(struct m2d_buffer* buf);
+
+/**
+ * Get the stride value for @buf.
+ *
+ * @param[in] buf A pointer to a 'struct m2d_buffer'.
+ * @return the number of bytes for @buf stride.
+ */
+size_t m2d_get_stride(const struct m2d_buffer* buf);
 
 /**
  * Wait for all queued operations/commands involving @buf to complete.

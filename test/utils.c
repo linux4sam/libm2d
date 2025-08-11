@@ -40,7 +40,7 @@ struct m2d_buffer* load_png(const char* filename)
 	target = cairo_image_surface_create_for_data(m2d_get_data(buf),
 						     CAIRO_FORMAT_ARGB32,
 						     width, height,
-						     stride);
+						     m2d_get_stride(buf));
 	if (cairo_surface_status(target) != CAIRO_STATUS_SUCCESS)
 		goto free_buffer;
 

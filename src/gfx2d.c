@@ -473,6 +473,11 @@ void* m2d_get_data(struct m2d_buffer* buf)
     return buf->cpu_addr;
 }
 
+size_t m2d_get_stride(const struct m2d_buffer* buf)
+{
+    return buf->stride;
+}
+
 int m2d_wait(const struct m2d_buffer* buf, const struct timespec* timeout)
 {
     struct drm_mchp_gfx2d_wait args;
