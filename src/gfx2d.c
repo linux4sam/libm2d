@@ -485,8 +485,10 @@ void m2d_blend_enable(bool enabled)
 }
 
 void m2d_blend_functions(enum m2d_blend_function rgb_func,
-                         enum m2d_blend_function /*alpha_func*/)
+                         enum m2d_blend_function alpha_func)
 {
+    (void)alpha_func;
+
     dev.state.function = to_gfx2d_blend_function(rgb_func);
 }
 
@@ -666,10 +668,13 @@ void m2d_draw_rectangles(const struct m2d_rectangle* rects, size_t num_rects)
     func(rects, num_rects);
 }
 
-void m2d_line_width(dim_t /*width*/)
+void m2d_line_width(dim_t width)
 {
+    (void)width;
 }
 
-void m2d_draw_lines(const struct m2d_line* /*lines*/, size_t /*num_lines*/)
+void m2d_draw_lines(const struct m2d_line* lines, size_t num_lines)
 {
+    (void)lines;
+    (void)num_lines;
 }
