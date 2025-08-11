@@ -67,11 +67,11 @@ static inline void m2d_log(int level, const char* format, ...)
 	va_end(ap);                                                     \
     }
 
-DEFINE_MSG(trace, LIBM2D_LEVEL_TRACE);
-DEFINE_MSG(debug, LIBM2D_LEVEL_DEBUG);
-DEFINE_MSG(info, LIBM2D_LEVEL_INFO);
-DEFINE_MSG(warn, LIBM2D_LEVEL_WARN);
-DEFINE_MSG(error, LIBM2D_LEVEL_ERROR);
+DEFINE_MSG(trace, LIBM2D_LEVEL_TRACE)
+DEFINE_MSG(debug, LIBM2D_LEVEL_DEBUG)
+DEFINE_MSG(info, LIBM2D_LEVEL_INFO)
+DEFINE_MSG(warn, LIBM2D_LEVEL_WARN)
+DEFINE_MSG(error, LIBM2D_LEVEL_ERROR)
 
 #if LIBM2D_ACTIVE_LEVEL <= LIBM2D_LEVEL_TRACE
 #define LIBM2D_TRACE(format, ...) trace_msg(format, ##__VA_ARGS__)
