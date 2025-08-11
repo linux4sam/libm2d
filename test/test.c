@@ -70,6 +70,22 @@ static void fill_background(uint8_t red, uint8_t green, uint8_t blue)
     m2d_source_color(255, 255, 255, 255);
 }
 
+static void draw_background(struct m2d_buffer* bg)
+{
+    struct m2d_rectangle rect;
+
+    m2d_source_enable(M2D_SRC, true);
+    m2d_source_enable(M2D_DST, false);
+    m2d_blend_enable(false);
+
+    m2d_set_source(M2D_SRC, bg, 0, 0);
+    rect.x = 0;
+    rect.y = 0;
+    rect.w = screen_width;
+    rect.h = screen_height;
+    m2d_draw_rectangles(&rect, 1);
+}
+
 static void draw_rectangles(void)
 {
     struct m2d_rectangle rects[10];
@@ -160,16 +176,7 @@ static void draw_images(void)
     if (!down)
         goto free_up;
 
-    m2d_source_enable(M2D_SRC, true);
-    m2d_source_enable(M2D_DST, false);
-    m2d_blend_enable(false);
-
-    m2d_set_source(M2D_SRC, bg, 0, 0);
-    rect.x = 0;
-    rect.y = 0;
-    rect.w = screen_width;
-    rect.h = screen_height;
-    m2d_draw_rectangles(&rect, 1);
+    draw_background(bg);
 
     sleep(3);
 
