@@ -229,6 +229,9 @@ int main(int argc, char* argv[])
     int ret = EXIT_FAILURE;
     int fd;
 
+    (void)argc;
+    (void)argv;
+
     srand(time(NULL));
 
     if (m2d_init() < 0)
