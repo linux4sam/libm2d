@@ -109,6 +109,8 @@ void m2d_print_rectangles(const struct m2d_rectangle* rects, size_t num_rects);
 static inline void
 m2d_print_rectangles(const struct m2d_rectangle* rects, size_t num_rects)
 {
+    (void)rects;
+    (void)num_rects;
 }
 #endif
 
