@@ -112,6 +112,8 @@ static void draw_squares(void)
     }
 
     m2d_source_color(255, 255, 255, 255);
+
+    sleep(1);
 }
 
 static void draw_images(void)
@@ -216,6 +218,8 @@ static void draw_images(void)
     m2d_set_source(M2D_SRC, off, rect.x, rect.y);
     m2d_draw_rectangles(&rect, 1);
 
+    sleep(1);
+
     m2d_free(down);
 free_up:
     m2d_free(up);
@@ -285,9 +289,8 @@ int main(int argc, char* argv[])
     m2d_set_source(M2D_DST, dst, 0, 0);
 
     draw_squares();
-    sleep(1);
     draw_images();
-    sleep(10);
+    sleep(9);
 
     ret = EXIT_SUCCESS;
 
