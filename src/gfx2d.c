@@ -557,6 +557,21 @@ void m2d_blend_functions(enum m2d_blend_function rgb_func,
     dev.state.function = to_gfx2d_blend_function(rgb_func);
 }
 
+static enum drm_mchp_gfx2d_blend_factor gfx2d_fix_afactor(enum drm_mchp_gfx2d_blend_factor afactor)
+{
+    switch (afactor)
+    {
+    case DRM_MCHP_GFX2D_BFACTOR_CONSTANT_COLOR:
+        return DRM_MCHP_GFX2D_BFACTOR_CONSTANT_ALPHA;
+    case DRM_MCHP_GFX2D_BFACTOR_ONE_MINUS_CONSTANT_COLOR:
+        return DRM_MCHP_GFX2D_BFACTOR_ONE_MINUS_CONSTANT_ALPHA;
+    default:
+        break;
+    }
+
+    return afactor;
+}
+
 void m2d_blend_factors(enum m2d_blend_factor src_rgb_factor,
                        enum m2d_blend_factor dst_rgb_factor,
                        enum m2d_blend_factor src_alpha_factor,
@@ -564,8 +579,8 @@ void m2d_blend_factors(enum m2d_blend_factor src_rgb_factor,
 {
     dev.state.scfactor = to_gfx2d_blend_factor(src_rgb_factor);
     dev.state.dcfactor = to_gfx2d_blend_factor(dst_rgb_factor);
-    dev.state.safactor = to_gfx2d_blend_factor(src_alpha_factor);
-    dev.state.dafactor = to_gfx2d_blend_factor(dst_alpha_factor);
+    dev.state.safactor = gfx2d_fix_afactor(to_gfx2d_blend_factor(src_alpha_factor));
+    dev.state.dafactor = gfx2d_fix_afactor(to_gfx2d_blend_factor(dst_alpha_factor));
 }
 
 static void gfx2d_blend(const struct m2d_rectangle* rects, size_t num_rects)
