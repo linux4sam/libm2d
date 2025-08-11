@@ -164,7 +164,7 @@ void m2d_cleanup()
 {
     LIBM2D_TRACE("cleaning libm2d up\n");
 
-    if( dev.fd < 0)
+    if (dev.fd < 0)
     {
         LIBM2D_ERROR("the DRM render node %s is not opened\n", GFX2D_DEV_FILENAME);
         return;
