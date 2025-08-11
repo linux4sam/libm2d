@@ -15,6 +15,8 @@ include(GNUInstallDirs)
 
 set(CMAKE_VERBOSE_MAKEFILE True)
 
+set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -O0 -ggdb")
+
 find_package(PkgConfig REQUIRED)
 
 pkg_check_modules(LIBDRM REQUIRED libdrm>=2.4.0)
