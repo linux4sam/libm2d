@@ -197,6 +197,9 @@ size_t m2d_byte_per_pixel(enum m2d_pixel_format format)
     case M2D_PF_RGB565:
         return 2;
 
+    case M2D_PF_A8:
+        return 1;
+
     default:
         break;
     }
