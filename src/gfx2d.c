@@ -351,11 +351,7 @@ void m2d_free(struct m2d_buffer* buf)
 
     if (buf->handle)
     {
-        struct drm_mchp_gfx2d_free_buffer args;
-
-        memset(&args, 0, sizeof(args));
-        args.handle = buf->handle;
-        if (drmIoctl(dev.fd, DRM_IOCTL_MCHP_GFX2D_FREE_BUFFER, &args) < 0)
+        if (drmCloseBufferHandle(dev.fd, buf->handle))
             LIBM2D_ERROR("could not free buffer: %s\n", strerror(errno));
     }
 
