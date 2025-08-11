@@ -369,12 +369,92 @@ free_bg:
     m2d_free(bg);
 }
 
+static void blend_premult_images(void)
+{
+    static const struct m2d_test_color
+    {
+        uint8_t r;
+        uint8_t g;
+        uint8_t b;
+        uint8_t a;
+    } colors[] =
+    {
+        { .r = 0xffu, .g = 0xffu, .b = 0xffu, .a = 0xffu },
+        { .r = 0xc0u, .g = 0xffu, .b = 0xffu, .a = 0xffu },
+        { .r = 0x80u, .g = 0xffu, .b = 0xffu, .a = 0xffu },
+        { .r = 0x40u, .g = 0xffu, .b = 0xffu, .a = 0xffu },
+        { .r = 0x00u, .g = 0xffu, .b = 0xffu, .a = 0xffu },
+        { .r = 0xffu, .g = 0xc0u, .b = 0xffu, .a = 0xffu },
+        { .r = 0xffu, .g = 0x80u, .b = 0xffu, .a = 0xffu },
+        { .r = 0xffu, .g = 0x40u, .b = 0xffu, .a = 0xffu },
+        { .r = 0xffu, .g = 0x00u, .b = 0xffu, .a = 0xffu },
+        { .r = 0xffu, .g = 0xffu, .b = 0xc0u, .a = 0xffu },
+        { .r = 0xffu, .g = 0xffu, .b = 0x80u, .a = 0xffu },
+        { .r = 0xffu, .g = 0xffu, .b = 0x40u, .a = 0xffu },
+        { .r = 0xffu, .g = 0xffu, .b = 0x00u, .a = 0xffu },
+        { .r = 0xffu, .g = 0xffu, .b = 0xffu, .a = 0xc0u },
+        { .r = 0xffu, .g = 0xffu, .b = 0xffu, .a = 0x80u },
+        { .r = 0xffu, .g = 0xffu, .b = 0xffu, .a = 0x40u },
+        { .r = 0xffu, .g = 0xffu, .b = 0xffu, .a = 0x00u },
+        { .r = 0x00u, .g = 0x00u, .b = 0x00u, .a = 0xffu },
+        { .r = 0x00u, .g = 0x00u, .b = 0x00u, .a = 0xc0u },
+        { .r = 0x00u, .g = 0x00u, .b = 0x00u, .a = 0x80u },
+        { .r = 0x00u, .g = 0x00u, .b = 0x00u, .a = 0x40u },
+        { .r = 0x00u, .g = 0x00u, .b = 0x00u, .a = 0x00u },
+    };
+    struct m2d_buffer* bg;
+    struct m2d_buffer* bg2;
+    struct m2d_rectangle rect;
+    char filename[256];
+    uint32_t i;
+
+    snprintf(filename, sizeof(filename), "%s/background_%ux%u.png",
+             TESTDATA, screen_width, screen_height);
+    bg = load_png(filename);
+    if (!bg)
+        return;
+
+    snprintf(filename, sizeof(filename), "%s/test_pattern_%ux%u.png",
+             TESTDATA, screen_width, screen_height);
+    bg2 = load_png(filename);
+    if (!bg2)
+        goto free_bg;
+
+    rect.x = 0;
+    rect.y = 0;
+    rect.w = screen_width;
+    rect.h = screen_height;
+    for (i = 0; i < ARRAY_SIZE(colors); i++)
+    {
+        const struct m2d_test_color* color = &colors[i];
+
+        draw_background(bg);
+
+        m2d_source_color(color->r, color->g, color->b, color->a);
+        m2d_source_enable(M2D_SRC, true);
+        m2d_source_enable(M2D_DST, true);
+        m2d_set_source(M2D_SRC, bg2, 0, 0);
+        m2d_set_source(M2D_DST, framebuffer, 0, 0);
+        m2d_blend_enable(true);
+        m2d_draw_rectangles(&rect, 1);
+        sleep(1);
+    }
+    m2d_source_color(255, 255, 255, 255);
+
+    sleep(1);
+
+    m2d_free(bg2);
+free_bg:
+    m2d_free(bg);
+}
+
 static const struct m2d_test tests[] =
 {
     { "Fill", fill },
     { "DrawRectangles", draw_rectangles },
     { "DrawImages", draw_images },
     { "BlendImages", blend_images },
+    { "BlendPremultImages", blend_premult_images },
     { "MaskImages", mask_images },
     { NULL, NULL}
 };
