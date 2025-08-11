@@ -76,6 +76,8 @@ static void draw_squares(void)
     struct m2d_rectangle* rect;
     uint32_t i;
 
+    fill_background(0, 0, 0); /* black */
+
     memset(rects, 0, sizeof(rects));
 
     m2d_source_enable(M2D_SRC, false);
@@ -282,7 +284,6 @@ int main(int argc, char* argv[])
     m2d_set_target(dst);
     m2d_set_source(M2D_DST, dst, 0, 0);
 
-    fill_background(0, 0, 0); /* black */
     draw_squares();
     sleep(1);
     draw_images();
