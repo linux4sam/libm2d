@@ -282,12 +282,100 @@ free_bg:
     m2d_free(bg);
 }
 
+static void mask_images(void)
+{
+    const enum m2d_pixel_format src_format = M2D_PF_ARGB8888;
+    const enum m2d_pixel_format msk_format = M2D_PF_A8;
+    const size_t sizes[] = {50, 100, 150};
+    struct m2d_buffer* msk;
+    struct m2d_buffer* src;
+    struct m2d_buffer* bg;
+    struct m2d_buffer* fg;
+    struct m2d_rectangle rect;
+    char filename[256];
+    uint32_t i;
+
+    snprintf(filename, sizeof(filename), "%s/background_%ux%u.png",
+             TESTDATA, screen_width, screen_height);
+    bg = load_png(filename);
+    if (!bg)
+        return;
+
+    snprintf(filename, sizeof(filename), "%s/background2_%ux%u.png",
+             TESTDATA, screen_width, screen_height);
+    fg = load_png(filename);
+    if (!fg)
+        goto free_bg;
+
+    msk = m2d_alloc(screen_width, screen_height, msk_format,
+                    stride(msk_format, screen_width));
+    if (!msk)
+        goto free_fg;
+
+    src = m2d_alloc(screen_width, screen_height, src_format,
+                    stride(src_format, screen_width));
+    if (!src)
+        goto free_msk;
+
+    /* Draw the background. */
+    draw_background(bg);
+
+    m2d_source_color(255, 255, 255, 255);
+
+    for (i = 0; i < 100; i++)
+    {
+        rect.w = sizes[rand() % ARRAY_SIZE(sizes)];
+        rect.h = sizes[rand() % ARRAY_SIZE(sizes)];
+        rect.x = rand() % (screen_width - rect.w);
+        rect.y = rand() % (screen_height - rect.h);
+
+        /* Fill the mask. */
+        m2d_source_enable(M2D_SRC, false);
+        m2d_source_enable(M2D_DST, false);
+        m2d_blend_enable(false);
+        m2d_set_target(msk);
+        m2d_draw_rectangles(&rect, 1);
+
+        /* Combine the foreground and dynamic mask into the source. */
+        m2d_set_source(M2D_SRC, fg, 0, 0);
+        m2d_set_source(M2D_DST, msk, 0, 0);
+        m2d_source_enable(M2D_SRC, true);
+        m2d_source_enable(M2D_DST, true);
+        m2d_blend_enable(true);
+        m2d_blend_factors(M2D_BLEND_ONE, M2D_BLEND_ZERO,
+                          M2D_BLEND_DST_ALPHA, M2D_BLEND_ZERO);
+        m2d_set_target(src);
+        m2d_draw_rectangles(&rect, 1);
+
+        /* Blend the source into the framebuffer. */
+        m2d_set_source(M2D_SRC, src, 0, 0);
+        m2d_set_source(M2D_DST, framebuffer, 0, 0);
+        m2d_blend_factors(M2D_BLEND_SRC_ALPHA, M2D_BLEND_ONE_MINUS_SRC_ALPHA,
+                          M2D_BLEND_ONE, M2D_BLEND_ONE_MINUS_SRC_ALPHA);
+        m2d_set_target(framebuffer);
+        m2d_draw_rectangles(&rect, 1);
+
+        usleep(100000);
+    }
+
+    sleep(1);
+
+    m2d_free(src);
+free_msk:
+    m2d_free(msk);
+free_fg:
+    m2d_free(fg);
+free_bg:
+    m2d_free(bg);
+}
+
 static const struct m2d_test tests[] =
 {
     { "Fill", fill },
     { "DrawRectangles", draw_rectangles },
     { "DrawImages", draw_images },
     { "BlendImages", blend_images },
+    { "MaskImages", mask_images },
     { NULL, NULL}
 };
 
