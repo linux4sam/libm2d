@@ -181,7 +181,7 @@ void m2d_print_rectangles(const struct m2d_rectangle* rects, size_t num_rects)
     {
         const struct m2d_rectangle* r = &rects[i];
 
-        trace_msg("rectangle %zu {origin: (%u,%u), size: [%ux%u]}\n",
+        trace_msg("rectangle %zu {origin: (%d,%d), size: [%dx%d]}\n",
                   i, r->x, r->y, r->w, r->h);
     }
 }

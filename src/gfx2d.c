@@ -511,9 +511,9 @@ static void gfx2d_blend(const struct m2d_rectangle* rects, size_t num_rects)
     const struct m2d_source* dst = &dev.state.sources[M2D_DST];
     struct drm_mchp_gfx2d_submit args;
 
-    LIBM2D_DEBUG("reading %s surface pixels from buffer %u {origin: (%u,%u)}\n",
+    LIBM2D_DEBUG("reading %s surface pixels from buffer %u {origin: (%d,%d)}\n",
                  m2d_source_name(M2D_SRC), src->buf->id, src->x, src->y);
-    LIBM2D_DEBUG("reading %s surface pixels from buffer %u {origin: (%u,%u)}\n",
+    LIBM2D_DEBUG("reading %s surface pixels from buffer %u {origin: (%d,%d)}\n",
                  m2d_source_name(M2D_DST), dst->buf->id, dst->x, dst->y);
 
     LIBM2D_TRACE("blend function: %s\n", m2d_blend_function_name(dev.state.function));
@@ -564,7 +564,7 @@ static void gfx2d_copy(const struct m2d_rectangle* rects, size_t num_rects)
     const struct m2d_source* src = &dev.state.sources[M2D_SRC];
     struct drm_mchp_gfx2d_submit args;
 
-    LIBM2D_DEBUG("reading %s surface pixels from buffer %u {origin: (%u,%u)}\n",
+    LIBM2D_DEBUG("reading %s surface pixels from buffer %u {origin: (%d,%d)}\n",
                  m2d_source_name(M2D_SRC), src->buf->id, src->x, src->y);
 
     memset(&args, 0, sizeof(args));
