@@ -9,8 +9,13 @@
 #include "m2d/m2d.h"
 
 #include <stdarg.h>
+#include <strings.h>
 
 #define unlikely(expr) (__builtin_expect (!!(expr), 0))
+
+#ifndef FIELD_PREP
+#define FIELD_PREP(_mask, _val) (((_val) << (ffsll(_mask) - 1)) & (_mask))
+#endif
 
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
