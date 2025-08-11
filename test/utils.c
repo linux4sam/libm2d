@@ -12,6 +12,7 @@
 struct m2d_buffer* load_png(const char* filename)
 {
 	struct m2d_buffer* buf = NULL;
+	struct timespec timeout;
 	cairo_t* cr;
 	cairo_surface_t* target;
 	cairo_surface_t* source;
@@ -30,6 +31,11 @@ struct m2d_buffer* load_png(const char* filename)
 	buf = m2d_alloc(width, height, M2D_PF_ARGB8888, stride);
 	if (!buf)
 		goto destroy_source;
+
+	clock_gettime(CLOCK_MONOTONIC, &timeout);
+	timeout.tv_sec += 1;
+	if (m2d_sync_for_cpu(buf, &timeout))
+		goto free_buffer;
 
 	target = cairo_image_surface_create_for_data(m2d_get_data(buf),
 						     CAIRO_FORMAT_ARGB32,
@@ -50,6 +56,8 @@ struct m2d_buffer* load_png(const char* filename)
 
 	cairo_surface_destroy(source);
 	cairo_destroy(cr);
+
+	m2d_sync_for_gpu(buf);
 
 	return buf;
 
