@@ -70,7 +70,7 @@ static void fill_background(uint8_t red, uint8_t green, uint8_t blue)
     m2d_source_color(255, 255, 255, 255);
 }
 
-static void draw_squares(void)
+static void draw_rectangles(void)
 {
     struct m2d_rectangle rects[10];
     struct m2d_rectangle* rect;
@@ -104,7 +104,7 @@ static void draw_squares(void)
 
         m2d_source_color(rand() & 255, rand() & 255, rand() & 255, 255);
         rect->w = sizes[rand() % ARRAY_SIZE(sizes)];
-        rect->h = rect->w;
+        rect->h = sizes[rand() % ARRAY_SIZE(sizes)];
         rect->x = rand() % (screen_width - rect->w);
         rect->y = rand() % (screen_height - rect->h);
         m2d_draw_rectangles(rects, 1);
@@ -288,7 +288,7 @@ int main(int argc, char* argv[])
     m2d_set_target(dst);
     m2d_set_source(M2D_DST, dst, 0, 0);
 
-    draw_squares();
+    draw_rectangles();
     draw_images();
     sleep(9);
 
