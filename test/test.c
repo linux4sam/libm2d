@@ -71,7 +71,7 @@ static void draw_squares(void)
 {
     struct m2d_rectangle rects[10];
     struct m2d_rectangle* rect;
-    int i;
+    uint32_t i;
 
     memset(rects, 0, sizeof(rects));
 
@@ -165,9 +165,9 @@ static void draw_images(void)
     m2d_set_source(M2D_SRC, bg2, 0, 0);
     rect.w = 100;
     rect.h = 100;
-    for (y = 0; y < screen_height; y += rect.h)
+    for (y = 0; y < (int)screen_height; y += rect.h)
     {
-        for (x = 0; x < screen_width; x += rect.w)
+        for (x = 0; x < (int)screen_width; x += rect.w)
         {
             rect.x = x;
             rect.y = y;
