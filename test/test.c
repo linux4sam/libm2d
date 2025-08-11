@@ -5,6 +5,7 @@
  */
 #include "utils.h"
 #include <drm_fourcc.h>
+#include <getopt.h>
 #include <m2d/m2d.h>
 #include <planes/kms.h>
 #include <planes/plane.h>
@@ -19,6 +20,13 @@
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 #endif
 
+struct m2d_test
+{
+    const char* name;
+    void (*func)(void);
+};
+
+static struct m2d_buffer* framebuffer;
 static size_t screen_width;
 static size_t screen_height;
 
@@ -217,6 +225,7 @@ static void blend_images(void)
 
     sleep(3);
 
+    m2d_set_source(M2D_DST, framebuffer, 0, 0);
     m2d_source_enable(M2D_DST, true);
 
     m2d_blend_enable(true);
@@ -259,17 +268,189 @@ free_bg:
     m2d_free(bg);
 }
 
+static const struct m2d_test tests[] =
+{
+    { "DrawRectangles", draw_rectangles },
+    { "DrawImages", draw_images },
+    { "BlendImages", blend_images },
+    { NULL, NULL}
+};
+
+static void list_tests(void)
+{
+    const struct m2d_test* test;
+
+    fprintf(stderr, "\nTests:\n");
+    for (test = tests; test->name; test++)
+        fprintf(stderr, "- %s\n", test->name);
+    fprintf(stderr, "\n");
+}
+
+static void help(const char* program)
+{
+    fprintf(stderr,
+            "Usage: %s [OPTIONS]\n"
+            "\n"
+            "OPTIONS:\n"
+            "  -h, --help        Display this message.\n"
+            "\n"
+            "  -a, --autoplay      Automatic progression.\n"
+            "  -d, --delay <sec>   When 'autoplay' option is set, delay in seconds before moving to the next test.\n"
+            "  -m, --mdelay <usec> When 'autoplay' option is set, delay in milliseconds before moving to the next test.\n"
+            "  -M, --manual        Manual progression: hit a key to move to the next test.\n"
+            "\n"
+            "  -l, --list          List tests\n"
+            "  -f, --filter <name> Execute only the <name> test\n",
+            program);
+}
+
+static int autoplay = -1;
+static unsigned long udelay = 0;
+static int manual = -1;
+static const struct m2d_test* single_test = NULL;
+
+static void parse_args(int argc, char* argv[])
+{
+    static const struct option long_options[] =
+    {
+        {"help", no_argument, NULL, 'h'},
+
+        {"autoplay", no_argument, NULL, 'a'},
+        {"delay", required_argument, NULL, 'd'},
+        {"mdelay", required_argument, NULL, 'm'},
+        {"manual", no_argument, NULL, 'M'},
+        {"list", no_argument, NULL, 'l'},
+        {"filter", required_argument, NULL, 'f'},
+        {NULL, 0, NULL, 0}
+    };
+    const char* test_name = NULL;
+
+    while (1)
+    {
+        int option_index = 0;
+        unsigned long value;
+        char* end;
+        int c;
+
+        c = getopt_long(argc, argv, "had:m:Mlf:", long_options, &option_index);
+
+        if (c == -1)
+            break;
+
+        switch (c)
+        {
+        case 'h':
+            help(argv[0]);
+            exit(EXIT_SUCCESS);
+            //break;
+
+        case 'a':
+            autoplay = 1;
+            break;
+
+        case 'M':
+            manual = 1;
+            break;
+
+        case 'd':
+            end = NULL;
+            value = strtoul(optarg, &end, 0);
+            if (!end || *end != '\0')
+            {
+                fprintf(stderr, "invalid value for delay: %s\n", optarg);
+                exit(EXIT_FAILURE);
+            }
+            udelay = value * 1000000UL;
+            break;
+
+        case 'm':
+            end = NULL;
+            value = strtoul(optarg, &end, 0);
+            if (!end || *end != '\0')
+            {
+                fprintf(stderr, "invalid value for mdelay: %s\n", optarg);
+                exit(EXIT_FAILURE);
+            }
+            udelay = value * 1000UL;
+            break;
+
+        case 'l':
+            list_tests();
+            exit(EXIT_SUCCESS);
+            //break;
+
+        case 'f':
+            test_name = optarg;
+            break;
+
+        default:
+            help(argv[0]);
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    if (autoplay < 0 && manual < 0)
+    {
+        autoplay = 1;
+        manual = 0;
+    }
+
+    if (autoplay > 0 && manual > 0)
+    {
+        fprintf(stderr, "'autoplay' and 'manual' options are exclusive\n");
+        exit(EXIT_FAILURE);
+    }
+
+    if (autoplay && !udelay)
+    {
+        udelay = 500000UL;
+    }
+
+    if (test_name)
+    {
+        const struct m2d_test* test;
+
+        for (test = tests; test->name; test++)
+        {
+            if (!strcmp(test->name, test_name))
+            {
+                single_test = test;
+                break;
+            }
+        }
+
+        if (!single_test)
+        {
+            fprintf(stderr, "unknown test: %s\n", test_name);
+            exit(EXIT_FAILURE);
+        }
+    }
+}
+
+static void next(void)
+{
+    if (autoplay > 0)
+    {
+        usleep(udelay);
+    }
+    else
+    {
+        int c;
+
+        fprintf(stderr, "\npress ENTER to continue\n");
+        while ((c = getchar()) != '\n' && c != EOF);
+    }
+}
+
 int main(int argc, char* argv[])
 {
     struct kms_device* device = NULL;
     struct plane_data* plane = NULL;
-    struct m2d_buffer* dst = NULL;
     struct m2d_import_desc desc;
     int ret = EXIT_FAILURE;
     int fd;
 
-    (void)argc;
-    (void)argv;
+    parse_args(argc, argv);
 
     srand(time(NULL));
 
@@ -307,22 +488,36 @@ int main(int argc, char* argv[])
     desc.stride = stride(desc.format, desc.width);
     desc.fd = plane->prime_fds[0];
     desc.cpu_addr = plane->bufs[0];
-    dst = m2d_import(&desc);
-    if (!dst)
+    framebuffer = m2d_import(&desc);
+    if (!framebuffer)
         goto release_plane;
 
-    m2d_set_target(dst);
-    m2d_set_source(M2D_DST, dst, 0, 0);
+    /* Default settings. */
+    m2d_set_target(framebuffer);
+    m2d_blend_functions(M2D_FUNC_ADD, M2D_FUNC_ADD);
+    m2d_blend_factors(M2D_BLEND_SRC_ALPHA, M2D_BLEND_ONE_MINUS_SRC_ALPHA,
+                      M2D_BLEND_ONE, M2D_BLEND_ONE_MINUS_SRC_ALPHA);
 
-    draw_rectangles();
-    draw_images();
-    blend_images();
-    sleep(9);
+    if (single_test)
+    {
+        single_test->func();
+        next();
+    }
+    else
+    {
+        const struct m2d_test* test;
+
+        for (test = tests; test->func; test++)
+        {
+            test->func();
+            next();
+        }
+    }
 
     ret = EXIT_SUCCESS;
 
-//free_dst_buffer:
-    m2d_free(dst);
+//free_framebuffer:
+    m2d_free(framebuffer);
 
 release_plane:
     plane_free(plane);
