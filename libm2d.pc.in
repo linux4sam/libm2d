@@ -4,7 +4,7 @@ libdir=@libdir@
 includedir=@includedir@
 
 Name: libm2d
-Description: Microchip 2D Graphics API
+Description: Multi 2D Graphics API
 Version: @PACKAGE_VERSION@
 Libs: -L${libdir} -lm2d
 Cflags: -I${includedir}

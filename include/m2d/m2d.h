@@ -7,7 +7,7 @@
 #define __M2D_H__
 /**
  * @file
- * @brief Microchip 2D API
+ * @brief Multi 2D API
  */
 
 #include <m2d/version.h>

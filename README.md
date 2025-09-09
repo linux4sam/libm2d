@@ -1,6 +1,4 @@
-![Microchip](docs/microchip_logo.png)
-
-# Microchip 2D Graphics API
+# Multi 2D Graphics API
 
 ## Dependencies
 

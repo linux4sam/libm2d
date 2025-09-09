@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.22)
 project(
     libm2d
     VERSION 2.1.0
-    DESCRIPTION "A linux middleware graphic library for Microchip MPUs"
+    DESCRIPTION "A linux graphics library abstracting 2D GPUs"
     LANGUAGES C
 )
 set(PROJECT_VERSION_RC 1)
