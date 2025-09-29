@@ -693,6 +693,7 @@ int main(int argc, char* argv[])
         goto release_plane;
 
     plane_apply(plane);
+    kms_device_flush(device, 0);
 
     memset(&desc, 0, sizeof(desc));
     desc.width = device->screens[0]->width;
