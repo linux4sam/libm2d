@@ -12,13 +12,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <xf86drm.h>
 
 static struct m2d_device* dev;
 
 int m2d_init()
 {
-    drmVersionPtr version;
+    int ret;
 
     LIBM2D_INFO("Version %s\n", M2D_VERSION);
     LIBM2D_INFO("Git Version %s\n", GIT_VERSION);
@@ -26,41 +25,12 @@ int m2d_init()
     dev = m2d_get_device();
 
     dev->next_id = 0;
-    dev->fd = drmOpenWithType(dev->name, NULL, DRM_NODE_RENDER);
-    if (dev->fd < 0)
-    {
-        LIBM2D_ERROR("can't open DRM render node %s: %s\n", dev->name, strerror(errno));
-        goto error;
-    }
 
-    (void)version;
-#if LIBM2D_ACTIVE_LEVEL <= LIBM2D_LEVEL_DEBUG
-    version = drmGetVersion(dev->fd);
-    if (version)
-    {
-        LIBM2D_DEBUG("DRM Version %d.%d.%d\n",
-                     version->version_major,
-                     version->version_minor,
-                     version->version_patchlevel);
-        LIBM2D_DEBUG("  Name: %s\n", version->name);
-        LIBM2D_DEBUG("  Date: %s\n", version->date);
-        LIBM2D_DEBUG("  Description: %s\n", version->desc);
-        drmFreeVersion(version);
-    }
-#endif
+    ret = dev->funcs->init();
+    if (ret < 0)
+        dev = NULL;
 
-    if (dev->funcs->init())
-        goto drm_close;
-
-    return 0;
-
-drm_close:
-    drmClose(dev->fd);
-    dev->fd = -1;
-
-error:
-    dev = NULL;
-    return -1;
+    return ret;
 }
 
 void m2d_cleanup()
@@ -69,14 +39,11 @@ void m2d_cleanup()
 
     if (!dev || dev->fd < 0)
     {
-        LIBM2D_ERROR("the DRM render node %s is not opened\n", dev->name);
+        LIBM2D_ERROR("the GPU device %s is not opened\n", dev->name);
         return;
     }
 
     dev->funcs->cleanup();
-
-    if (drmClose(dev->fd))
-        LIBM2D_ERROR("can't close DRM render node %s: %s\n", dev->name, strerror(errno));
 
     dev->fd = -1;
     dev = NULL;
@@ -247,7 +214,7 @@ void m2d_draw_rectangles(const struct m2d_rectangle* rects, size_t num_rects)
 {
     if (dev->fd < 0)
     {
-        LIBM2D_ERROR("the DRM render node %s is not opened\n", dev->name);
+        LIBM2D_ERROR("the GPU device %s is not opened\n", dev->name);
         return;
     }
 

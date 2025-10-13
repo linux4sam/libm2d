@@ -21,9 +21,6 @@ set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -O0 -ggdb")
 
 find_package(PkgConfig REQUIRED)
 
-pkg_check_modules(LIBDRM REQUIRED libdrm>=2.4.0)
-set(AX_PACKAGE_REQUIRES_PRIVATE "libdrm >= 2.4.0")
-
 set(PACKAGE_VERSION ${PROJECT_VERSION})
 
 set(SUPPORTED_GPUS "microchip,sam9x60-gfx2d" "microchip,sam9x7-gfx2d")

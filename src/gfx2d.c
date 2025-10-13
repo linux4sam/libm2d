@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 #include "m2d/m2d.h"
+#include "m2d_drm.h"
 #include "m2d_priv.h"
 
 #include <drm/microchip_drm.h>
@@ -281,11 +282,12 @@ static bool gfx2d_surface_is_valid(size_t width, size_t height,
 
 static int gfx2d_init()
 {
-    return 0;
+    return m2d_drm_open(&dev.base);
 }
 
 static void gfx2d_cleanup()
 {
+    m2d_drm_close(&dev.base);
 }
 
 static struct m2d_buffer* gfx2d_create(size_t width, size_t height,

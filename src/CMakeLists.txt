@@ -2,8 +2,12 @@ add_library(m2d
     m2d.c
 )
 
+set(LIBDRM_MIN_VERSION 2.4.0)
+
 if(GPU MATCHES "^microchip,sam.*-gfx2d$")
     target_sources(m2d PRIVATE gfx2d.c)
+
+    set(NEED_LIBDRM ON)
 endif()
 
 set_target_properties(m2d PROPERTIES VERSION 2.1.0 SOVERSION 2)
@@ -31,11 +35,18 @@ target_include_directories(m2d PRIVATE
     ${CMAKE_BINARY_DIR}
 )
 
-target_include_directories(m2d PRIVATE ${LIBDRM_INCLUDE_DIRS})
-target_compile_options(m2d PRIVATE ${LIBDRM_CFLAGS_OTHER})
-target_link_directories(m2d PRIVATE ${LIBDRM_LIBRARY_DIRS})
-target_link_libraries(m2d PRIVATE ${LIBDRM_LIBRARIES})
-target_link_options(m2d PRIVATE ${LIBDRM_LDFLAGS_OTHER})
+if(NEED_LIBDRM)
+    pkg_check_modules(LIBDRM REQUIRED libdrm>=${LIBDRM_MIN_VERSION})
+    set(AX_PACKAGE_REQUIRES_PRIVATE "${AX_PACKAGE_REQUIRES_PRIVATE} libdrm >= ${LIBDRM_MIN_VERSION}")
+
+    target_include_directories(m2d PRIVATE ${LIBDRM_INCLUDE_DIRS})
+    target_compile_options(m2d PRIVATE ${LIBDRM_CFLAGS_OTHER})
+    target_link_directories(m2d PRIVATE ${LIBDRM_LIBRARY_DIRS})
+    target_link_libraries(m2d PRIVATE ${LIBDRM_LIBRARIES})
+    target_link_options(m2d PRIVATE ${LIBDRM_LDFLAGS_OTHER})
+
+    target_sources(m2d PRIVATE m2d_drm.c)
+endif()
 
 set(prefix ${CMAKE_INSTALL_PREFIX})
 set(exec_prefix \${prefix})
