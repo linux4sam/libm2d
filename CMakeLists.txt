@@ -38,6 +38,8 @@ else()
     message(FATAL_ERROR "unsupported GPU: \"${GPU}\" (supported GPUs: ${SUPPORTED_GPUS})")
 endif()
 
+option(BUILD_SHARED_LIBS "Build using shared libraries" ON)
+
 add_subdirectory(src)
 
 option(ENABLE_TESTS "build tests [default=OFF]" OFF)

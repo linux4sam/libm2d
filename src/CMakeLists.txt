@@ -1,4 +1,4 @@
-add_library(m2d SHARED
+add_library(m2d
     m2d.c
 )
 
