@@ -8,6 +8,7 @@
 #include "gitversion.h"
 
 #include <errno.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -418,4 +419,35 @@ size_t m2d_byte_per_pixel(enum m2d_pixel_format format)
     }
 
     return 0;
+}
+
+uint32_t m2d_multiply_colors(uint32_t color1, uint32_t color2)
+{
+    uint32_t color = 0;
+    uint32_t shift;
+
+    for (shift = 0; shift < 32; shift += 8)
+    {
+        uint32_t mask = 0xffu << shift;
+        uint8_t c1 = (uint8_t)FIELD_GET(mask, color1);
+        uint8_t c2 = (uint8_t)FIELD_GET(mask, color2);
+        uint8_t c;
+
+        if (!c1 || !c2)
+            c = 0;
+        else if (c1 == 0xffu)
+            c = c2;
+        else if (c2 == 0xffu)
+            c = c1;
+        else
+        {
+            float f1 = (float)c1 / 255.f;
+            float f2 = (float)c2 / 255.f;
+            c = (uint8_t)round(f1 * f2 * 255.f);
+        }
+
+        color |= c << shift;
+    }
+
+    return color;
 }

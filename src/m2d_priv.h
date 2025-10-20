@@ -219,4 +219,6 @@ m2d_print_rectangles(const struct m2d_rectangle* rects, size_t num_rects)
 
 size_t m2d_byte_per_pixel(enum m2d_pixel_format format);
 
+uint32_t m2d_multiply_colors(uint32_t color1, uint32_t color2);
+
 #endif /* M2D_PRIV_H */
