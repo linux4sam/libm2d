@@ -19,6 +19,10 @@
 #define FIELD_PREP(_mask, _val) (((_val) << (ffsll(_mask) - 1)) & (_mask))
 #endif
 
+#ifndef FIELD_GET
+#define FIELD_GET(_mask, _reg) (((_reg) & (_mask)) >> (ffsll(_mask) - 1))
+#endif
+
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 #endif
