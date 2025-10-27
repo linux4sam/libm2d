@@ -2,6 +2,7 @@ add_executable(m2d_test test.c utils.c)
 target_link_libraries(m2d_test PRIVATE m2d)
 
 target_compile_definitions(m2d_test PRIVATE TESTDATA="${CMAKE_INSTALL_FULL_DATADIR}/m2d")
+target_include_directories(m2d_test PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
 target_include_directories(m2d_test PRIVATE ${LIBPLANES_INCLUDE_DIRS})
 target_compile_options(m2d_test PRIVATE ${LIBPLANES_CFLAGS_OTHER})

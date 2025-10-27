@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 #include "utils.h"
+#include "m2d_priv.h"
 #include <drm_fourcc.h>
 #include <getopt.h>
 #include <m2d/m2d.h>
@@ -15,10 +16,6 @@
 #include <time.h>
 #include <unistd.h>
 #include <xf86drm.h>
-
-#ifndef ARRAY_SIZE
-#define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
-#endif
 
 struct m2d_test
 {
