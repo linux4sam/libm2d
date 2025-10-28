@@ -325,6 +325,14 @@ const char* m2d_source_name(enum m2d_source_id id)
         SOURCE_TO_STR(SRC);
         SOURCE_TO_STR(DST);
         SOURCE_TO_STR(MSK);
+        SOURCE_TO_STR(SRC0);
+        SOURCE_TO_STR(SRC1);
+        SOURCE_TO_STR(SRC2);
+        SOURCE_TO_STR(SRC3);
+        SOURCE_TO_STR(SRC4);
+        SOURCE_TO_STR(SRC5);
+        SOURCE_TO_STR(SRC6);
+        SOURCE_TO_STR(SRC7);
     default:
         break;
     }

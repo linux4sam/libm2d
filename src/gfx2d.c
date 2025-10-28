@@ -508,6 +508,14 @@ void m2d_source_enable(enum m2d_source_id id, bool enabled)
     dev.state.sources[id].enabled = enabled;
 }
 
+void m2d_select_source(enum m2d_source_id id)
+{
+    (void)id;
+
+    if (id != M2D_SRC)
+        LIBM2D_ERROR("GFX2D does not support per source blending parameters!\n");
+}
+
 void m2d_source_color(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha)
 {
     dev.state.source_color = gfx2d_color(red, green, blue, alpha);

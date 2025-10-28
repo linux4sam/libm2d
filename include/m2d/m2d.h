@@ -208,17 +208,21 @@ void m2d_set_target(struct m2d_buffer* buf);
 
 /**
  * Identifiers for source surfaces.
- *
- * - M2D_SRC: the only source for a copy operation the source surface for
- *            blending or ROP.
- * - M2D_DST: the destination surface for blending or ROP.
- * - M2D_MSK: the mask for ROP.
  */
 enum m2d_source_id
 {
     M2D_SRC,
     M2D_DST,
     M2D_MSK,
+
+    M2D_SRC0,
+    M2D_SRC1,
+    M2D_SRC2,
+    M2D_SRC3,
+    M2D_SRC4,
+    M2D_SRC5,
+    M2D_SRC6,
+    M2D_SRC7,
 
     M2D_MAX_SOURCES
 };
@@ -255,13 +259,32 @@ void m2d_set_source(enum m2d_source_id id, struct m2d_buffer* buf, dim_t x, dim_
 void m2d_source_enable(enum m2d_source_id id, bool enabled);
 
 /**
- * Set the constant source color in the current renderer state.
- * red == green == blue == alpha == 255 disables the pre-multiplication.
+ * Select the source to be configured next from its @id.
  *
- * For GFX2D:
- * FILL operation: fill the destination surface with the constant source color.
- * BLEND operation: pre-multiply the source surface with the constant source color, if not {255, 255, 255, 255}.
- * COPY operation: unused.
+ * @param[in] id The id of the new selected source.
+ *
+ * @note When the GPU supports per source blending parameters, functions
+ *       in the following list apply to the currently selected source:
+ *       - @m2d_source_color()
+ *       - @m2d_blend_color()
+ *       - @m2d_blend_enable()
+ *       - @m2d_blend_functions()
+ *       - @m2d_blend_factors()
+ *       Otherwise, for GPU having only global blending parameters,
+ *       these functions always apply to the M2D_SRC source.
+ */
+void m2d_select_source(enum m2d_source_id id);
+
+/**
+ * Set the constant source color for the current source.
+ *
+ * For the current source:
+ *
+ *  source    blend
+ * disabled  disabled : fill the target surface with the constant source color.
+ * disabled  enabled  : use the constant source color as the pixel color for the current source when blending.
+ * enabled   disabled : ignore the constant source color; just copy the current source surface into the target surface.
+ * enabled   enabled  : pre-multiply the current source surface with the constant source color, if not {255, 255, 255, 255}, then blend.
  *
  * @param[in] red The red component of the constant source color.
  * @param[in] green The green component of the constant source color.
@@ -271,7 +294,7 @@ void m2d_source_enable(enum m2d_source_id id, bool enabled);
 void m2d_source_color(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha);
 
 /**
- * Set the constant blend color in the current renderer state.
+ * Set the constant blend color for the current source.
  *
  * @param[in] red The red component of the constant blend color.
  * @param[in] green The green component of the constant blend color.
@@ -281,7 +304,7 @@ void m2d_source_color(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha);
 void m2d_blend_color(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha);
 
 /**
- * Enable/disable blending mode in the current renderer state.
+ * Enable/disable blending mode for the current source.
  *
  * @param[in] enabled The boolean telling whether the blending mode should be either enabled (true) or disabled (false).
  */
@@ -317,7 +340,7 @@ enum m2d_blend_function {
 const char* m2d_blend_function_name(enum m2d_blend_function function);
 
 /**
- * Change the blend functions in the current renderer state.
+ * Change the blend functions for the current source.
  *
  * @param[in] rgb_func The function for rgb components.
  * @param[in] alpha_func The function for the alpha component (ignored for GFX2D: use the same as rgb_func).
@@ -351,7 +374,7 @@ enum m2d_blend_factor {
 const char* m2d_blend_factor_name(enum m2d_blend_factor factor);
 
 /**
- * Change the blend factors in the current renderer state.
+ * Change the blend factors for the current source.
  *
  * @param[in] src_rgb_factor
  * @param[in] dst_rgb_factor
@@ -384,13 +407,6 @@ struct m2d_rectangle {
 /**
  * Draw rectangles according to the current renderer state.
  * This is asynchronous (non-blocking).
- *
- * For instance, with GFX2D,
- * {@m2d_source_enable() , @m2d_blend_enable()}:
- * {false , false} : FILL operation with constant source color.
- * {false , true}  : Not supported.
- * {true , false}  : COPY operation.
- * {true , true}   : BLEND operation.
  *
  * @param[in] rects The array of rectangles to draw.
  * @param[in] num_rects The number of rectangles in the 'rects' array.
