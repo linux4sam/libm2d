@@ -311,6 +311,162 @@ free_bg:
     m2d_free(bg);
 }
 
+static void draw_multi_sources_ex(bool alpha, uint8_t global_alpha)
+{
+    static const char* files[] =
+    {
+        "red_circle_alpha",
+        "blue_circle_alpha",
+        "green_circle_alpha",
+        "yellow_circle_alpha",
+        "top_left",
+        "top_right",
+        "bottom_left",
+        "bottom_right",
+    };
+    struct test_source
+    {
+        struct m2d_buffer* buf;
+        dim_t x;
+        dim_t y;
+    } sources[ARRAY_SIZE(files)];
+    struct m2d_buffer* bg;
+    struct m2d_rectangle rect;
+    char filename[256];
+    size_t num_sources;
+    size_t i;
+    bool first = true;
+    uint32_t blit_max_sources;
+    uint32_t per_source_blend_params;
+
+    m2d_get_capability(M2D_CAP_BLIT_MAX_SOURCES, &blit_max_sources);
+    m2d_get_capability(M2D_CAP_PER_SOURCE_BLEND_PARAMS, &per_source_blend_params);
+    if (blit_max_sources < ARRAY_SIZE(sources) || !per_source_blend_params)
+        return;
+
+    num_sources = ARRAY_SIZE(sources);
+
+    snprintf(filename, sizeof(filename), "%s/background_%ux%u.png",
+	     TESTDATA, screen_width, screen_height);
+    bg = load_png(filename);
+    if (!bg)
+        return;
+
+    memset(sources, 0, sizeof(sources));
+    for (i = 0; i < num_sources; i++)
+    {
+        struct test_source* source = &sources[i];
+        const struct m2d_buffer* buf;
+        struct m2d_rectangle r;
+        size_t center_x, center_y;
+        size_t margin;
+
+        snprintf(filename, sizeof(filename), "%s/%s.png",
+                 TESTDATA, files[i]);
+        source->buf = load_png(filename);
+        if (!source->buf)
+            goto exit;
+
+        buf = source->buf;
+
+        center_x = (screen_width - buf->width) >> 1;
+        center_y = (screen_height - buf->height) >> 1;
+        margin = min_size_t(center_x, center_y) * 3 / 4;
+        margin = min_size_t(margin, min_size_t(buf->width, buf->height) >> 2);
+
+        switch (i & 3)
+        {
+        default:
+        case 0:
+            source->x = center_x - margin;
+            source->y = center_y - margin;
+            break;
+
+        case 1:
+            source->x = center_x + margin;
+            source->y = center_y - margin;
+            break;
+
+        case 2:
+            source->x = center_x - margin;
+            source->y = center_y + margin;
+            break;
+
+        case 3:
+            source->x = center_x + margin;
+            source->y = center_y + margin;
+            break;
+        }
+
+        r.x = source->x;
+        r.y = source->y;
+        r.w = buf->width;
+        r.h = buf->height;
+        if (first)
+        {
+            rect = r;
+            first = false;
+        }
+        else
+        {
+            m2d_merge(&r, &rect, &rect);
+        }
+    }
+
+    draw_background(bg);
+
+    for (i = 0; i < num_sources; i++)
+    {
+        const struct test_source* source = &sources[i];
+        enum m2d_source_id id = M2D_SRC0 + i;
+
+        m2d_source_enable(id, true);
+        m2d_set_source(id, source->buf, source->x, source->y);
+        m2d_select_source(id);
+        m2d_source_color(0xffu, 0xffu, 0xffu, global_alpha);
+        m2d_blend_enable(alpha);
+        m2d_blend_functions(M2D_FUNC_ADD, M2D_FUNC_ADD);
+        m2d_blend_factors(M2D_BLEND_SRC_ALPHA, M2D_BLEND_ONE_MINUS_SRC_ALPHA,
+                          M2D_BLEND_ONE, M2D_BLEND_ONE_MINUS_SRC_ALPHA);
+    }
+
+    m2d_draw_rectangles(&rect, 1);
+
+    sleep(1);
+
+    for (i = 0; i < num_sources; i++)
+    {
+        enum m2d_source_id id = M2D_SRC0 + i;
+
+        m2d_source_enable(id, false);
+        m2d_set_source(id, NULL, 0, 0);
+        m2d_select_source(id);
+        m2d_source_color(0xffu, 0xffu, 0xffu, 0xffu);
+        m2d_blend_enable(false);
+    }
+
+exit:
+    for (i = 0; i < num_sources; i++)
+        if (sources[i].buf)
+            m2d_free(sources[i].buf);
+    m2d_free(bg);
+}
+
+static void draw_multi_sources(void)
+{
+    draw_multi_sources_ex(false, 0xffu);
+}
+
+static void blend_multi_sources(void)
+{
+    draw_multi_sources_ex(true, 0xffu);
+}
+
+static void blend_multi_sources_global_alpha(void)
+{
+    draw_multi_sources_ex(true, 0x7fu);
+}
+
 static void mask_images(void)
 {
     const enum m2d_pixel_format src_format = M2D_PF_ARGB8888;
@@ -484,6 +640,9 @@ static const struct m2d_test tests[] =
     { "DrawRectanglesAlpha", draw_rectangles_alpha },
     { "DrawImages", draw_images },
     { "BlendImages", blend_images },
+    { "DrawMultiSources", draw_multi_sources },
+    { "BlendMultiSources", blend_multi_sources },
+    { "BlendMultiSourcesGlobalAlpha", blend_multi_sources_global_alpha },
     { "BlendPremultImages", blend_premult_images },
     { "MaskImages", mask_images },
     { NULL, NULL}
