@@ -15,6 +15,14 @@
 
 #define unlikely(expr) (__builtin_expect (!!(expr), 0))
 
+#ifndef BIT
+#define BIT(n) (1U << (n))
+#endif
+
+#ifndef GENMASK
+#define GENMASK(h, l) (((~0U) << (l)) & (~0U >> (8 * sizeof(~0U) - 1 - (h))))
+#endif
+
 #ifndef FIELD_PREP
 #define FIELD_PREP(_mask, _val) (((_val) << (ffsll(_mask) - 1)) & (_mask))
 #endif
