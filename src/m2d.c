@@ -322,6 +322,21 @@ bool m2d_intersect(const struct m2d_rectangle* a,
     return true;
 }
 
+void m2d_merge(const struct m2d_rectangle* a,
+               const struct m2d_rectangle* b,
+               struct m2d_rectangle* result)
+{
+    dim_t min_x = (dim_t)min_int(a->x, b->x);
+    dim_t max_x = (dim_t)max_int((int)a->x + a->w, (int)b->x + b->w);
+    dim_t min_y = (dim_t)min_int(a->y, b->y);
+    dim_t max_y = (dim_t)max_int((int)a->y + a->h, (int)b->y + b->h);
+
+    result->x = min_x;
+    result->y = min_y;
+    result->w = max_x - min_x;
+    result->h = max_y - min_y;
+}
+
 static int m2d_active_log_level()
 {
     static int level = -1;

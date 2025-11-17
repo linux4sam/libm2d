@@ -133,6 +133,10 @@ bool m2d_intersect(const struct m2d_rectangle* a,
                    const struct m2d_rectangle* b,
                    struct m2d_rectangle* result);
 
+void m2d_merge(const struct m2d_rectangle* a,
+               const struct m2d_rectangle* b,
+               struct m2d_rectangle* result);
+
 #define LIBM2D_LEVEL_TRACE 0
 #define LIBM2D_LEVEL_DEBUG 1
 #define LIBM2D_LEVEL_INFO 2
