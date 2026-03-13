@@ -40,6 +40,11 @@ endif()
 
 option(BUILD_SHARED_LIBS "Build using shared libraries" ON)
 
+option(ENABLE_M2D_ASSERT "Enable m2d_assert() macro [default=OFF]" OFF)
+if(ENABLE_M2D_ASSERT)
+    add_compile_definitions(M2D_ASSERT=1)
+endif()
+
 add_subdirectory(src)
 
 option(ENABLE_TESTS "build tests [default=OFF]" OFF)

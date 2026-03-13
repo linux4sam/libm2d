@@ -61,6 +61,20 @@ DEFINE_MIN_MAX(size_t)
 #define container_of(ptr, type, member) ((type *)((unsigned char *)(ptr) - offsetof(type, member)))
 #endif
 
+#ifdef M2D_ASSERT
+#include <stdio.h>
+
+#define m2d_assert(_expr)                                                                        \
+    do {                                                                                         \
+        if (!(_expr)) {                                                                          \
+            fprintf(stderr, "%s(%d): Assertion `%s' failed.\n", __func__, __LINE__, #_expr);     \
+            while (1);                                                                           \
+        }                                                                                        \
+    } while (0)
+#else
+#define m2d_assert(_expr)
+#endif
+
 struct m2d_buffer
 {
     uint32_t id;
