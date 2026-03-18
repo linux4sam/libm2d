@@ -451,3 +451,19 @@ uint32_t m2d_multiply_colors(uint32_t color1, uint32_t color2)
 
     return color;
 }
+
+uint32_t m2d_one_minus_color(uint32_t color)
+{
+    uint32_t out_color = 0;
+    uint32_t shift;
+
+    for (shift = 0; shift < 32; shift += 8)
+    {
+        uint32_t mask = 0xffu << shift;
+        uint8_t c = 255 - (uint8_t)FIELD_GET(mask, color);
+
+        out_color |=  c << shift;
+    }
+
+    return out_color;
+}

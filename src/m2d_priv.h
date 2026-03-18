@@ -221,4 +221,6 @@ size_t m2d_byte_per_pixel(enum m2d_pixel_format format);
 
 uint32_t m2d_multiply_colors(uint32_t color1, uint32_t color2);
 
+uint32_t m2d_one_minus_color(uint32_t color);
+
 #endif /* M2D_PRIV_H */
