@@ -9,6 +9,7 @@
 #include <m2d/m2d.h>
 
 struct m2d_buffer* load_png(const char* filename);
+int save_png(const struct m2d_buffer* buf, const char* filename);
 
 void fps_start(void);
 void fps_frame(void);

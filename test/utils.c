@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 #include "utils.h"
+#include "m2d_priv.h"
 #include <assert.h>
 #include <cairo.h>
 #include <stdio.h>
@@ -70,6 +71,60 @@ destroy_source:
 
 end:
 	return buf;
+}
+
+static cairo_format_t to_cairo_format(enum m2d_pixel_format format)
+{
+    cairo_format_t fmt;
+
+    switch (format)
+    {
+    default:
+    case M2D_PF_ARGB8888:
+        fmt = CAIRO_FORMAT_ARGB32;
+        break;
+
+    case M2D_PF_RGB565:
+        fmt = CAIRO_FORMAT_RGB16_565;
+        break;
+
+    case M2D_PF_A8:
+        fmt = CAIRO_FORMAT_A8;
+        break;
+    }
+
+    return fmt;
+}
+
+int save_png(const struct m2d_buffer* buf, const char* filename)
+{
+    cairo_surface_t* surface;
+    struct timespec timeout;
+    int ret = 0;
+
+    clock_gettime(CLOCK_MONOTONIC, &timeout);
+    timeout.tv_sec += 1;
+    if (m2d_sync_for_cpu((struct m2d_buffer*)buf, &timeout))
+        return -1;
+
+    surface = cairo_image_surface_create_for_data((unsigned char*)buf->cpu_addr,
+                                                  to_cairo_format(buf->format),
+                                                  buf->width,
+                                                  buf->height,
+                                                  buf->stride);
+    if (cairo_surface_status(surface) != CAIRO_STATUS_SUCCESS)
+    {
+        ret = -1;
+        goto end;
+    }
+
+    if (cairo_surface_write_to_png(surface, filename) != CAIRO_STATUS_SUCCESS)
+        ret = -1;
+
+    cairo_surface_destroy(surface);
+end:
+    m2d_sync_for_gpu((struct m2d_buffer*)buf);
+    return ret;
 }
 
 static void timespec_diff(struct timespec *start, struct timespec *stop,
