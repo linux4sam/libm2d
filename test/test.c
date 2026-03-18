@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <termios.h>
 #include <time.h>
 #include <unistd.h>
 #include <xf86drm.h>
@@ -26,6 +27,8 @@ struct m2d_test
 static struct m2d_buffer* framebuffer;
 static size_t screen_width;
 static size_t screen_height;
+
+static void next(void);
 
 static size_t stride(enum m2d_pixel_format format, size_t width)
 {
@@ -94,15 +97,15 @@ static void draw_background(struct m2d_buffer* bg)
 static void fill(void)
 {
     fill_background(0, 0, 0);
-    usleep(250000);
+    next();
     fill_background(255, 0, 0);
-    usleep(250000);
+    next();
     fill_background(0, 255, 0);
-    usleep(250000);
+    next();
     fill_background(0, 0, 255);
-    usleep(250000);
+    next();
     fill_background(255, 255, 255);
-    usleep(250000);
+    next();
 }
 
 static void draw_rectangles(void)
@@ -263,7 +266,7 @@ static void blend_images(void)
 
     draw_background(bg);
 
-    sleep(3);
+    next();
 
     m2d_set_source(M2D_DST, framebuffer, 0, 0);
     m2d_source_enable(M2D_DST, true);
@@ -295,7 +298,7 @@ static void blend_images(void)
     m2d_set_source(M2D_SRC, off, rect.x, rect.y);
     m2d_draw_rectangles(&rect, 1);
 
-    sleep(1);
+    next();
 
     m2d_free(down);
 free_up:
@@ -463,7 +466,7 @@ static void blend_premult_images(void)
         m2d_set_source(M2D_DST, framebuffer, 0, 0);
         m2d_blend_enable(true);
         m2d_draw_rectangles(&rect, 1);
-        sleep(1);
+        next();
     }
     m2d_source_color(255, 255, 255, 255);
 
@@ -645,10 +648,23 @@ static void next(void)
     }
     else
     {
-        int c;
+        struct termios saved_state;
+        struct termios new_state;
 
-        fprintf(stderr, "\npress ENTER to continue\n");
-        while ((c = getchar()) != '\n' && c != EOF);
+        fprintf(stderr, "\npress a key to continue\n");
+
+        if (tcgetattr(STDIN_FILENO, &saved_state) < 0)
+            return;
+
+        new_state = saved_state;
+        new_state.c_lflag &= ~(ECHO | ICANON);
+        new_state.c_cc[VMIN] = 1;
+
+        if (tcsetattr(STDIN_FILENO, TCSANOW, &new_state) < 0)
+            return;
+
+        (void)getchar();
+        (void)tcsetattr(STDIN_FILENO, TCSANOW, &saved_state);
     }
 }
 
