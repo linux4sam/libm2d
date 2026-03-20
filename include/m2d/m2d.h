@@ -54,52 +54,54 @@ int m2d_init();
 void m2d_cleanup();
 
 /**
- * struct m2d_capabilities - Describe the hardware capabilities and requirements
+ * enum m2d_capability - Describe a hardware capability or requirement
  */
-struct m2d_capabilities
+enum m2d_capability
 {
     /**
-     * @stride_alignment
+     * @M2D_CAP_STRIDE_ALIGNMENT
      *
      * Define to the number of bytes required as the alignment for stride values:
      * 1 means no requirement.
      */
-    uint32_t stride_alignment;
+    M2D_CAP_STRIDE_ALIGNMENT,
 
     /**
-     * @max_sources
+     * @M2D_CAP_BLIT_MAX_SOURCES
      *
-     * Define the maximum number of sources per rectangle supported by the GPU
-     * hardware.
+     * Define the maximum number of sources for blit operations.
      */
-    uint32_t max_sources;
+    M2D_CAP_BLIT_MAX_SOURCES,
 
     /**
-     * @has_dst
-     * Tell whether the GPU hardware makes the difference between the target
-     * and destination surfaces and manage the destination surface as a source.
+     * @M2D_CAP_PER_SOURCE_BLEND_PARAMS
+     * Tell whether the blend parameters are global to all sources or set per source.
      */
-    bool dst_is_source;
+    M2D_CAP_PER_SOURCE_BLEND_PARAMS,
 
     /**
-     * @draw_lines
+     * @M2D_CAP_DRAW_LINES
      *
      * Tell whether the GPU hardware can draw lines.
      */
-    bool draw_lines;
+    M2D_CAP_DRAW_LINES,
 
     /**
-     * @stretched_blit
+     * @M2D_CAP_STRETCHED_BLIT
      *
      * Tell whether the GPU hardware can stretch or shrink source surfaces.
      */
-    bool stretched_blit;
+    M2D_CAP_STRETCHED_BLIT,
 };
 
 /**
- * Get the GPU capabilities.
+ * Get the GPU capability.
+ *
+ * @param[in] capability The ID of the requested capability.
+ * @param[out] value The value of the requested capability.
+ * @return 0 if the capability value has successfully been retrieved, -1 otherwise.
  */
-const struct m2d_capabilities* m2d_get_capabilities();
+int m2d_get_capability(enum m2d_capability capability, uint32_t* value);
 
 /**
  * Allocate a new DRM GEM object to share a memory region between the userspace application and the GPU.

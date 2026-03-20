@@ -108,6 +108,15 @@ struct m2d_device_funcs
     void (*draw_lines)(const struct m2d_line* lines, size_t num_lines);
 };
 
+struct m2d_capabilities
+{
+    uint32_t stride_alignment;
+    uint32_t blit_max_sources;
+    bool per_source_blend_params;
+    bool draw_lines;
+    bool stretched_blit;
+};
+
 struct m2d_device
 {
     const char* name;

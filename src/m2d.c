@@ -82,9 +82,41 @@ void m2d_cleanup()
     dev = NULL;
 }
 
-const struct m2d_capabilities* m2d_get_capabilities()
+int m2d_get_capability(enum m2d_capability capability, uint32_t* value)
 {
-    return dev ? dev->caps : NULL;
+    const struct m2d_capabilities* caps = dev->caps;
+    int ret = 0;
+
+    m2d_assert(dev && dev->caps);
+    switch (capability)
+    {
+    case M2D_CAP_STRIDE_ALIGNMENT:
+        *value = caps->stride_alignment;
+        break;
+
+    case M2D_CAP_BLIT_MAX_SOURCES:
+        *value = caps->blit_max_sources;
+        break;
+
+    case M2D_CAP_PER_SOURCE_BLEND_PARAMS:
+        *value = caps->per_source_blend_params;
+        break;
+
+    case M2D_CAP_DRAW_LINES:
+        *value = caps->draw_lines;
+        break;
+
+    case M2D_CAP_STRETCHED_BLIT:
+        *value = caps->stretched_blit;
+        break;
+
+    default:
+        LIBM2D_ERROR("unknown capability: %u\n", capability);
+        ret = -1;
+        break;
+    }
+
+    return ret;
 }
 
 struct m2d_buffer* m2d_alloc(size_t width, size_t height,

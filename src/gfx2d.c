@@ -17,6 +17,8 @@
 
 #define GFX2D_DEV_FILENAME "microchip-gfx2d"
 
+#define GFX2D_MAX_SOURCES 3
+
 #define GFX2D_DIM_MASK  0x1fffu
 
 struct gfx2d_buffer
@@ -46,7 +48,7 @@ struct gfx2d_state
     struct gfx2d_buffer* target;
 
     uint32_t source_color;
-    struct gfx2d_source sources[M2D_MAX_SOURCES];
+    struct gfx2d_source sources[GFX2D_MAX_SOURCES];
 
     bool blend_enabled;
     uint32_t blend_color;
@@ -66,8 +68,8 @@ struct gfx2d_device
 static const struct m2d_capabilities gfx2d_caps =
 {
     .stride_alignment = 1,
-    .max_sources = 1,
-    .dst_is_source = true,
+    .blit_max_sources = 2,
+    .per_source_blend_params = false,
     .draw_lines = false,
     .stretched_blit = false,
 };
@@ -489,7 +491,7 @@ void m2d_set_target(struct m2d_buffer* buf)
 
 void m2d_set_source(enum m2d_source_id id, struct m2d_buffer* buf, dim_t x, dim_t y)
 {
-    if (id >= M2D_MAX_SOURCES)
+    if (id >= GFX2D_MAX_SOURCES)
         return;
 
     struct gfx2d_source* source = &dev.state.sources[id];
@@ -500,7 +502,7 @@ void m2d_set_source(enum m2d_source_id id, struct m2d_buffer* buf, dim_t x, dim_
 
 void m2d_source_enable(enum m2d_source_id id, bool enabled)
 {
-    if (id >= M2D_MAX_SOURCES)
+    if (id >= GFX2D_MAX_SOURCES)
         return;
 
     dev.state.sources[id].enabled = enabled;
