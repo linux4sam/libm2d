@@ -55,6 +55,7 @@ static inline type max_##type(type a, type b)    \
 }
 
 DEFINE_MIN_MAX(int)
+DEFINE_MIN_MAX(size_t)
 
 #ifndef container_of
 #define container_of(ptr, type, member) ((type *)((unsigned char *)(ptr) - offsetof(type, member)))
