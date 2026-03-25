@@ -15,6 +15,14 @@
 
 #define unlikely(expr) (__builtin_expect (!!(expr), 0))
 
+#ifndef IS_ALIGNED
+#define IS_ALIGNED(x, a) (((x) & ((a) - 1)) == 0)
+#endif
+
+#ifndef ALIGN
+#define ALIGN(x, a) (((x) + (a) - 1) & ~((a) - 1))
+#endif
+
 #ifndef BIT
 #define BIT(n) (1U << (n))
 #endif
