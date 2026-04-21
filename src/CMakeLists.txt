@@ -52,7 +52,7 @@ if(IS_NANO2D)
     endif()
 endif()
 
-set_target_properties(m2d PROPERTIES VERSION 3.0.0 SOVERSION 3)
+set_target_properties(m2d PROPERTIES VERSION 3.0.1 SOVERSION 3)
 
 target_sources(m2d PUBLIC FILE_SET HEADERS
     BASE_DIRS ${CMAKE_SOURCE_DIR}/include ${CMAKE_BINARY_DIR}/include

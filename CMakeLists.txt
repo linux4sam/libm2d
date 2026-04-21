@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.22)
 
 project(
     libm2d
-    VERSION 2.2.0
+    VERSION 2.2.1
     DESCRIPTION "A linux graphics library abstracting 2D GPUs"
     LANGUAGES C
 )
