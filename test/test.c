@@ -445,6 +445,8 @@ static void draw_multi_sources_ex(bool alpha, uint8_t global_alpha)
         m2d_blend_enable(false);
     }
 
+    m2d_select_source(M2D_SRC);
+
 exit:
     for (i = 0; i < num_sources; i++)
         if (sources[i].buf)
